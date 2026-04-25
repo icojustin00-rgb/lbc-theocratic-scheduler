@@ -137,7 +137,8 @@ h2 {
   color: #94a3b8;
 }
 
-.workbook-box {
+.workbook-box,
+.sync-box {
   border: 1px solid #ddd;
   border-radius: 12px;
   padding: 12px;
@@ -148,6 +149,11 @@ h2 {
 .helper-text {
   color: #64748b;
   font-size: 14px;
+}
+
+.wide-input {
+  width: 100%;
+  margin-bottom: 10px;
 }
 
 .balance-grid {
@@ -189,4 +195,138 @@ h2 {
 
 .group-box h3 {
   margin-bottom: 10px;
+}
+
+.print-toggle {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.printable-area {
+  margin-top: 20px;
+  background: #f8fafc;
+  padding: 20px;
+  border-radius: 16px;
+}
+
+.print-actions {
+  margin-bottom: 16px;
+  text-align: right;
+}
+
+.print-page {
+  background: white;
+  color: black;
+  max-width: 900px;
+  margin: 0 auto 24px auto;
+  padding: 28px;
+  border: 1px solid #222;
+  font-family: Arial, sans-serif;
+}
+
+.print-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.print-header h2 {
+  text-align: left;
+  font-size: 18px;
+  margin: 0 0 4px 0;
+}
+
+.print-header p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.print-date-box {
+  border: 1px solid #111;
+  padding: 8px 12px;
+  font-weight: bold;
+  min-width: 120px;
+  text-align: center;
+}
+
+.bethel-table {
+  width: 100%;
+  min-width: 0;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.bethel-table td {
+  border: 1px solid #222;
+  padding: 6px 8px;
+}
+
+.time-cell {
+  width: 70px;
+  text-align: center;
+}
+
+.label-cell {
+  width: 60%;
+  text-align: left;
+}
+
+.name-cell {
+  width: 30%;
+  font-weight: bold;
+  text-align: left;
+}
+
+.section-blue td,
+.section-blue {
+  background: #d9eaf7;
+  font-weight: bold;
+  text-align: left;
+}
+
+.section-gold td,
+.section-gold {
+  background: #f4d58d;
+  font-weight: bold;
+  text-align: left;
+}
+
+.section-red td,
+.section-red {
+  background: #f4cccc;
+  font-weight: bold;
+  text-align: left;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .printable-area,
+  .printable-area * {
+    visibility: visible;
+  }
+
+  .printable-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: white;
+    padding: 0;
+  }
+
+  .print-actions {
+    display: none;
+  }
+
+  .print-page {
+    border: none;
+    margin: 0;
+    max-width: 100%;
+    page-break-after: always;
+  }
 }

@@ -1,9 +1,25 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "./App.css";
 
-/* =========================
+/* =========================================================
+   KINGDOM HALL SCHEDULING SYSTEM
+   Full App.jsx
+   Includes:
+   - AV Scheduler
+   - AV Summary
+   - Theocratic Scheduler
+   - Per-row JW.org Sync
+   - Workbook Setup manual parser
+   - Dynamic student parts
+   - Appointed Balance
+   - Publisher Balance
+   - Detailed summaries
+   - Printable Schedule below Parts Table
+   ========================================================= */
+
+/* =========================================================
    DATA
-========================= */
+   ========================================================= */
 
 const AV_BROTHERS = [
   "Aldreen Pascobillo",
@@ -226,28 +242,56 @@ const PUBLISHERS = Object.values(PUBLISHER_GROUPS).flat();
 
 const APPOINTED_FIELDS = [
   ["chairman", "Chairman"],
-  ["openingPrayer", "Opening Prayer"],
-  ["treasuresTalk", "Treasures Talk"],
-  ["spiritualGems", "Spiritual Gems"],
-  ["livingAsChristians", "Living as Christians"],
-  ["cbs", "CBS"],
+  ["openingPrayer", "Pambukas na Panalangin"],
+  ["treasuresTalk", "Kayamanan sa Salita ng Diyos"],
+  ["spiritualGems", "Espirituwal na Hiyas"],
+  ["livingAsChristians", "Pamumuhay Bilang Kristiyano"],
+  ["cbs", "Pag-aaral ng Kongregasyon sa Bibliya"],
   ["reader", "Reader"],
-  ["closingPrayer", "Closing Prayer"],
+  ["closingPrayer", "Pangwakas na Panalangin"],
 ];
 
 const STUDENT_PART_TYPES = [
-  "Starting a Conversation",
-  "Following Up",
-  "Making Disciples",
-  "Explain Your Belief",
-  "Talk",
+  "Pagpapasimula ng Pakikipag-usap",
+  "Pakikipag-usap Muli",
+  "Paggawa ng mga Alagad",
+  "Ipaliwanag ang Paniniwala Mo",
+  "Pahayag",
 ];
+
+const STUDENT_TYPE_TO_ENGLISH = {
+  "Pagpapasimula ng Pakikipag-usap": "Starting a Conversation",
+  "Pakikipag-usap Muli": "Following Up",
+  "Paggawa ng mga Alagad": "Making Disciples",
+  "Ipaliwanag ang Paniniwala Mo": "Explain Your Belief",
+  Pahayag: "Talk",
+};
+
+const ENGLISH_TO_STUDENT_TYPE = {
+  "Starting a Conversation": "Pagpapasimula ng Pakikipag-usap",
+  "Following Up": "Pakikipag-usap Muli",
+  "Making Disciples": "Paggawa ng mga Alagad",
+  "Explain Your Belief": "Ipaliwanag ang Paniniwala Mo",
+  Talk: "Pahayag",
+};
 
 const MAX_STUDENT_PARTS = 5;
 
-/* =========================
+const MEETING_STATUS_OPTIONS = [
+  { value: "normal", label: "Normal" },
+  { value: "memorial", label: "Memorial" },
+  { value: "assembly", label: "Assembly" },
+  { value: "convention", label: "Convention" },
+  { value: "special-event", label: "Special Event" },
+];
+
+function getStatusLabel(value) {
+  return MEETING_STATUS_OPTIONS.find((item) => item.value === value)?.label || "Normal";
+}
+
+/* =========================================================
    HELPERS
-========================= */
+   ========================================================= */
 
 function shuffle(list) {
   return [...list].sort(() => Math.random() - 0.5);
@@ -307,14 +351,27 @@ function makeTheocraticRows(monthValue) {
     .map((row, index) => {
       const newRow = {
         ...row,
+        workbookUrl: "",
+        syncStatus: "",
         bibleReading: "",
         studentParts: [
-          { type: "Starting a Conversation", publisher: "" },
-          { type: "Following Up", publisher: "" },
-          { type: "Making Disciples", publisher: "" },
-          { type: index === 0 ? "Talk" : "", publisher: "" },
+          { type: "Pagpapasimula ng Pakikipag-usap", publisher: "" },
+          { type: "Pakikipag-usap Muli", publisher: "" },
+          { type: "Paggawa ng mga Alagad", publisher: "" },
+          { type: index === 0 ? "Pahayag" : "", publisher: "" },
           { type: "", publisher: "" },
         ],
+        workbook: {
+          weekTitle: "",
+          bibleChapters: "",
+          songs: {
+            opening: "",
+            middle: "",
+            closing: "",
+          },
+          treasuresTitle: "",
+          livingParts: [],
+        },
       };
 
       APPOINTED_FIELDS.forEach(([field]) => {
@@ -331,9 +388,46 @@ function countColor(total) {
   return "green";
 }
 
-/* =========================
+function normalizeStudentType(type) {
+  if (!type) return "";
+  if (ENGLISH_TO_STUDENT_TYPE[type]) return ENGLISH_TO_STUDENT_TYPE[type];
+  if (STUDENT_PART_TYPES.includes(type)) return type;
+  return type;
+}
+
+function detectStudentPartFromLine(line) {
+  const text = line.toLowerCase();
+
+  if (text.includes("starting") || text.includes("pagpapasimula")) {
+    return "Pagpapasimula ng Pakikipag-usap";
+  }
+
+  if (text.includes("following") || text.includes("muli")) {
+    return "Pakikipag-usap Muli";
+  }
+
+  if (text.includes("making disciples") || text.includes("alagad")) {
+    return "Paggawa ng mga Alagad";
+  }
+
+  if (
+    text.includes("explain") ||
+    text.includes("belief") ||
+    text.includes("paniniwala")
+  ) {
+    return "Ipaliwanag ang Paniniwala Mo";
+  }
+
+  if (text.includes("talk") || text.includes("pahayag")) {
+    return "Pahayag";
+  }
+
+  return null;
+}
+
+/* =========================================================
    SMALL COMPONENTS
-========================= */
+   ========================================================= */
 
 function MainTabs({ active, setActive }) {
   return (
@@ -440,9 +534,138 @@ function BalanceCard({ name, total }) {
   );
 }
 
-/* =========================
+/* =========================================================
+   PRINTABLE SCHEDULE COMPONENT
+   ========================================================= */
+
+function PrintableSchedule({ rows }) {
+  return (
+    <div className="printable-area">
+      <div className="print-actions">
+        <button onClick={() => window.print()}>Print / Save as PDF</button>
+      </div>
+
+      {rows.map((row, index) => {
+        if (row.meetingStatus && row.meetingStatus !== "normal") {
+          return (
+            <div key={`${row.date}-${index}`} className="print-page">
+              <div className="print-header">
+                <div>
+                  <h2>Iskedyul ng Pulong Para sa Buhay at Ministeryo</h2>
+                  <p>{row.workbook?.weekTitle || row.date}</p>
+                </div>
+                <div className="print-date-box">{row.date}</div>
+              </div>
+
+              <div className="no-meeting-print">
+                <h2>WALANG PULONG SA GITNANG SANLINGGO</h2>
+                <p>{getStatusLabel(row.meetingStatus)}</p>
+              </div>
+            </div>
+          );
+        }
+
+        return (
+        <div key={`${row.date}-${index}`} className="print-page">
+          <div className="print-header">
+            <div>
+              <h2>Iskedyul ng Pulong Para sa Buhay at Ministeryo</h2>
+              <p>{row.workbook?.weekTitle || row.date}</p>
+            </div>
+            <div className="print-date-box">{row.date}</div>
+          </div>
+
+          <table className="bethel-table">
+            <tbody>
+              <tr>
+                <td className="time-cell"></td>
+                <td className="label-cell">Chairman</td>
+                <td className="name-cell">{row.chairman}</td>
+              </tr>
+              <tr>
+                <td className="time-cell"></td>
+                <td className="label-cell">Pambukas na Panalangin</td>
+                <td className="name-cell">{row.openingPrayer}</td>
+              </tr>
+              <tr className="section-blue">
+                <td colSpan="3">KAYAMANAN MULA SA SALITA NG DIYOS</td>
+              </tr>
+              <tr>
+                <td className="time-cell"></td>
+                <td className="label-cell">
+                  {row.workbook?.treasuresTitle || "Kayamanan sa Salita ng Diyos"}
+                </td>
+                <td className="name-cell">{row.treasuresTalk}</td>
+              </tr>
+              <tr>
+                <td className="time-cell"></td>
+                <td className="label-cell">Espirituwal na Hiyas</td>
+                <td className="name-cell">{row.spiritualGems}</td>
+              </tr>
+              <tr>
+                <td className="time-cell"></td>
+                <td className="label-cell">Pagbabasa ng Bibliya</td>
+                <td className="name-cell">{row.bibleReading}</td>
+              </tr>
+
+              <tr className="section-gold">
+                <td colSpan="3">MAGING MAHUSAY SA MINISTERYO</td>
+              </tr>
+
+              {row.studentParts
+                .filter((part) => part.type)
+                .map((part, partIndex) => (
+                  <tr key={`${row.date}-student-${partIndex}`}>
+                    <td className="time-cell"></td>
+                    <td className="label-cell">{part.type}</td>
+                    <td className="name-cell">{part.publisher}</td>
+                  </tr>
+                ))}
+
+              <tr className="section-red">
+                <td colSpan="3">PAMUMUHAY BILANG KRISTIYANO</td>
+              </tr>
+              <tr>
+                <td className="time-cell"></td>
+                <td className="label-cell">Pamumuhay Bilang Kristiyano</td>
+                <td className="name-cell">{row.livingAsChristians}</td>
+              </tr>
+
+              {(row.workbook?.livingParts || []).map((part, partIndex) => (
+                <tr key={`${row.date}-living-${partIndex}`}>
+                  <td className="time-cell"></td>
+                  <td className="label-cell">{part}</td>
+                  <td className="name-cell"></td>
+                </tr>
+              ))}
+
+              <tr>
+                <td className="time-cell"></td>
+                <td className="label-cell">Pag-aaral ng Kongregasyon sa Bibliya</td>
+                <td className="name-cell">{row.cbs}</td>
+              </tr>
+              <tr>
+                <td className="time-cell"></td>
+                <td className="label-cell">Reader</td>
+                <td className="name-cell">{row.reader}</td>
+              </tr>
+              <tr>
+                <td className="time-cell"></td>
+                <td className="label-cell">Pangwakas na Panalangin</td>
+                <td className="name-cell">{row.closingPrayer}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* =========================================================
    AV SCHEDULER
-========================= */
+   ========================================================= */
 
 function AVScheduler() {
   const [title, setTitle] = useState("LBC TECHNICAL SCHEDULE");
@@ -677,22 +900,20 @@ function AVScheduler() {
   );
 }
 
-/* =========================
+/* =========================================================
    THEOCRATIC SCHEDULER
-========================= */
+   ========================================================= */
 
 function TheocraticScheduler() {
   const [title, setTitle] = useState("LBC THEOCRATIC PARTS SCHEDULE");
   const [month, setMonth] = useState("2026-04");
   const [rows, setRows] = useState(() => makeTheocraticRows("2026-04"));
   const [workbookPaste, setWorkbookPaste] = useState({});
-  const [workbookUrl, setWorkbookUrl] = useState("");
-  const [syncStatus, setSyncStatus] = useState("");
+  const [showPrintable, setShowPrintable] = useState(false);
 
   useEffect(() => {
     setRows(makeTheocraticRows(month));
     setWorkbookPaste({});
-    setSyncStatus("");
   }, [month]);
 
   const updateRow = (index, field, value) => {
@@ -717,34 +938,12 @@ function TheocraticScheduler() {
     );
   };
 
-  const detectStudentPart = (line) => {
-    const text = line.toLowerCase();
-
-    if (text.includes("starting") || text.includes("pagpapasimula")) {
-      return "Starting a Conversation";
-    }
-
-    if (text.includes("following") || text.includes("muli")) {
-      return "Following Up";
-    }
-
-    if (text.includes("making disciples") || text.includes("alagad")) {
-      return "Making Disciples";
-    }
-
-    if (
-      text.includes("explain") ||
-      text.includes("belief") ||
-      text.includes("paniniwala")
-    ) {
-      return "Explain Your Belief";
-    }
-
-    if (text.includes("talk") || text.includes("pahayag")) {
-      return "Talk";
-    }
-
-    return null;
+  const updateWorkbookUrl = (rowIndex, value) => {
+    setRows((current) =>
+      current.map((row, index) =>
+        index === rowIndex ? { ...row, workbookUrl: value } : row
+      )
+    );
   };
 
   const parseWorkbookText = (rowIndex) => {
@@ -752,7 +951,7 @@ function TheocraticScheduler() {
 
     const detected = text
       .split(/\n|\r/)
-      .map((line) => detectStudentPart(line.trim()))
+      .map((line) => detectStudentPartFromLine(line.trim()))
       .filter(Boolean)
       .slice(0, MAX_STUDENT_PARTS);
 
@@ -772,13 +971,42 @@ function TheocraticScheduler() {
     );
   };
 
-  const syncWorkbook = async () => {
-    if (!workbookUrl.trim()) {
-      setSyncStatus("Please paste a JW.org workbook link first.");
+  const syncWorkbookRow = async (rowIndex) => {
+    const row = rows[rowIndex];
+    const url = row?.workbookUrl?.trim();
+
+    if (row?.meetingStatus && row.meetingStatus !== "normal") {
+      setRows((current) =>
+        current.map((item, index) =>
+          index === rowIndex
+            ? {
+                ...item,
+                syncStatus: `Sync skipped because this row is marked as ${getStatusLabel(row.meetingStatus)}.`,
+              }
+            : item
+        )
+      );
       return;
     }
 
-    setSyncStatus("Syncing workbook...");
+    if (!url) {
+      setRows((current) =>
+        current.map((item, index) =>
+          index === rowIndex
+            ? { ...item, syncStatus: "Please paste a JW.org workbook link first." }
+            : item
+        )
+      );
+      return;
+    }
+
+    setRows((current) =>
+      current.map((item, index) =>
+        index === rowIndex
+          ? { ...item, syncStatus: "Syncing workbook..." }
+          : item
+      )
+    );
 
     try {
       const response = await fetch("/sync-workbook", {
@@ -786,7 +1014,7 @@ function TheocraticScheduler() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ url: workbookUrl }),
+        body: JSON.stringify({ url }),
       });
 
       if (!response.ok) {
@@ -794,32 +1022,56 @@ function TheocraticScheduler() {
       }
 
       const data = await response.json();
-      const weeks = Array.isArray(data.weeks) ? data.weeks : [];
+      const week = Array.isArray(data.weeks) ? data.weeks[0] : null;
 
-      setRows((current) =>
-        current.map((row, rowIndex) => {
-          const week = weeks[rowIndex];
-          if (!week) return row;
+      if (!week) {
+        throw new Error("No week data returned");
+      }
 
-          const detected = Array.isArray(week.studentParts)
-            ? week.studentParts.slice(0, MAX_STUDENT_PARTS)
-            : [];
+      const detected = Array.isArray(week.studentParts)
+        ? week.studentParts.slice(0, MAX_STUDENT_PARTS).map(normalizeStudentType)
+        : [];
 
-          const studentParts = Array.from({ length: MAX_STUDENT_PARTS }).map(
-            (_, partIndex) => ({
-              type: detected[partIndex] || "",
-              publisher: "",
-            })
-          );
-
-          return { ...row, studentParts };
+      const studentParts = Array.from({ length: MAX_STUDENT_PARTS }).map(
+        (_, partIndex) => ({
+          type: detected[partIndex] || "",
+          publisher: "",
         })
       );
 
-      setSyncStatus("Synced. Review the detected parts before assigning names.");
+      setRows((current) =>
+        current.map((item, index) => {
+          if (index !== rowIndex) return item;
+
+          return {
+            ...item,
+            studentParts,
+            syncStatus: "Synced. Review the detected parts before assigning names.",
+            workbook: {
+              ...item.workbook,
+              weekTitle: week.weekTitle || item.workbook?.weekTitle || item.date,
+              bibleChapters:
+                week.bibleChapters || item.workbook?.bibleChapters || "",
+              treasuresTitle:
+                week.treasuresTitle || item.workbook?.treasuresTitle || "",
+              livingParts: Array.isArray(week.livingParts)
+                ? week.livingParts
+                : item.workbook?.livingParts || [],
+            },
+          };
+        })
+      );
     } catch (error) {
-      setSyncStatus(
-        "Sync failed. It will fully work after deploying to Cloudflare Pages with functions/sync-workbook.js."
+      setRows((current) =>
+        current.map((item, index) =>
+          index === rowIndex
+            ? {
+                ...item,
+                syncStatus:
+                  "Sync failed. Check functions/sync-workbook.js and redeploy to Cloudflare Pages.",
+              }
+            : item
+        )
       );
     }
   };
@@ -941,6 +1193,8 @@ function TheocraticScheduler() {
     const addStudentPart = (name, type) => {
       if (!name || !map[name]) return;
 
+      const englishType = STUDENT_TYPE_TO_ENGLISH[type] || type;
+
       const keyMap = {
         "Starting a Conversation": "startingConversation",
         "Following Up": "followingUp",
@@ -949,7 +1203,7 @@ function TheocraticScheduler() {
         Talk: "talk",
       };
 
-      const key = keyMap[type];
+      const key = keyMap[englishType];
 
       if (!key) return;
 
@@ -1007,29 +1261,6 @@ function TheocraticScheduler() {
       <Tabs
         tabs={[
           {
-            label: "JW.org Sync",
-            content: (
-              <div className="card">
-                <h3>Sync from JW.org Workbook</h3>
-                <p className="helper-text">
-                  Paste the Life and Ministry Meeting Workbook link. This needs
-                  Cloudflare Pages Functions to work after deployment.
-                </p>
-
-                <input
-                  value={workbookUrl}
-                  onChange={(e) => setWorkbookUrl(e.target.value)}
-                  placeholder="Paste JW.org workbook link here"
-                  className="wide-input"
-                />
-
-                <button onClick={syncWorkbook}>Sync Workbook</button>
-
-                {syncStatus && <p className="helper-text">{syncStatus}</p>}
-              </div>
-            ),
-          },
-          {
             label: "Parts Table",
             content: (
               <div className="card scroll">
@@ -1039,17 +1270,19 @@ function TheocraticScheduler() {
                   <thead>
                     <tr>
                       <th>Date</th>
+                      <th>Status</th>
+                      <th>Workbook Link</th>
 
                       {APPOINTED_FIELDS.map(([, label]) => (
                         <th key={label}>{label}</th>
                       ))}
 
-                      <th>Bible Reading</th>
+                      <th>Pagbabasa ng Bibliya</th>
 
                       {Array.from({ length: MAX_STUDENT_PARTS }).map(
                         (_, index) => (
                           <th key={`student-${index}`}>
-                            Student Part {index + 1}
+                            Bahagi {index + 1}
                           </th>
                         )
                       )}
@@ -1060,6 +1293,40 @@ function TheocraticScheduler() {
                     {rows.map((row, rowIndex) => (
                       <tr key={`${row.date}-${rowIndex}`}>
                         <td>{row.date}</td>
+
+                        <td>
+                          <select
+                            value={row.meetingStatus || "normal"}
+                            onChange={(e) =>
+                              updateRow(rowIndex, "meetingStatus", e.target.value)
+                            }
+                          >
+                            {MEETING_STATUS_OPTIONS.map((status) => (
+                              <option key={status.value} value={status.value}>
+                                {status.label}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+
+                        <td className="sync-cell">
+                          <input
+                            value={row.workbookUrl || ""}
+                            onChange={(e) =>
+                              updateWorkbookUrl(rowIndex, e.target.value)
+                            }
+                            placeholder="Paste JW.org link"
+                            className="row-sync-input"
+                          />
+                          <button onClick={() => syncWorkbookRow(rowIndex)}>
+                            Sync
+                          </button>
+                          {row.syncStatus ? (
+                            <div className="row-sync-status">
+                              {row.syncStatus}
+                            </div>
+                          ) : null}
+                        </td>
 
                         {APPOINTED_FIELDS.map(([field]) => (
                           <td key={field}>
@@ -1090,30 +1357,54 @@ function TheocraticScheduler() {
                             key={partIndex}
                             className={!part.type ? "inactive" : ""}
                           >
+                            <select
+                              value={part.type || ""}
+                              onChange={(e) =>
+                                updateStudentPart(
+                                  rowIndex,
+                                  partIndex,
+                                  "type",
+                                  e.target.value
+                                )
+                              }
+                            >
+                              <option value="">—</option>
+                              {STUDENT_PART_TYPES.map((type) => (
+                                <option key={type} value={type}>
+                                  {type}
+                                </option>
+                              ))}
+                            </select>
+
                             {part.type ? (
-                              <>
-                                <div className="part-label">{part.type}</div>
-                                <PublisherSelect
-                                  value={part.publisher}
-                                  onChange={(e) =>
-                                    updateStudentPart(
-                                      rowIndex,
-                                      partIndex,
-                                      "publisher",
-                                      e.target.value
-                                    )
-                                  }
-                                />
-                              </>
-                            ) : (
-                              "—"
-                            )}
+                              <PublisherSelect
+                                value={part.publisher}
+                                onChange={(e) =>
+                                  updateStudentPart(
+                                    rowIndex,
+                                    partIndex,
+                                    "publisher",
+                                    e.target.value
+                                  )
+                                }
+                              />
+                            ) : null}
                           </td>
                         ))}
                       </tr>
                     ))}
                   </tbody>
                 </table>
+
+                <div className="print-toggle">
+                  <button onClick={() => setShowPrintable((value) => !value)}>
+                    {showPrintable
+                      ? "Hide Printable Schedule"
+                      : "Show Printable Schedule"}
+                  </button>
+                </div>
+
+                {showPrintable ? <PrintableSchedule rows={rows} /> : null}
               </div>
             ),
           },
@@ -1241,12 +1532,12 @@ function TheocraticScheduler() {
                           <thead>
                             <tr>
                               <th>Publisher</th>
-                              <th>Bible Reading</th>
-                              <th>Starting</th>
-                              <th>Following</th>
-                              <th>Making Disciples</th>
-                              <th>Explain Belief</th>
-                              <th>Talk</th>
+                              <th>Pagbabasa ng Bibliya</th>
+                              <th>Pagpapasimula</th>
+                              <th>Pakikipag-usap Muli</th>
+                              <th>Paggawa ng Alagad</th>
+                              <th>Ipaliwanag Paniniwala</th>
+                              <th>Pahayag</th>
                               <th>Total</th>
                             </tr>
                           </thead>
@@ -1281,9 +1572,9 @@ function TheocraticScheduler() {
   );
 }
 
-/* =========================
+/* =========================================================
    APP
-========================= */
+   ========================================================= */
 
 export default function App() {
   const [mainTab, setMainTab] = useState("av");
