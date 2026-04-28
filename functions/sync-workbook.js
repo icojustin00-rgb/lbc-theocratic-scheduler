@@ -1,80 +1,100 @@
 export async function onRequestPost(context) {
   try {
-    const body = await context.request.json();
-    const { url } = body;
+    const { url } = await context.request.json();
 
     if (!url) {
-      return Response.json({ error: "No URL provided" }, { status: 400 });
+      return new Response(JSON.stringify({ error: "No URL provided" }), {
+        status: 400,
+      });
     }
 
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0",
-        "Accept-Language": "tl,en;q=0.9",
-      },
-    });
+    // Use proxy (important for JW.org)
+    const proxy = "https://api.allorigins.win/raw?url=" + encodeURIComponent(url);
 
-    if (!response.ok) {
-      return Response.json(
-        { error: `Failed to fetch workbook: ${response.status}` },
-        { status: 500 }
-      );
-    }
-
+    const response = await fetch(proxy);
     const html = await response.text();
 
+    // REMOVE HTML TAGS → get text only
     const text = html
-      .replace(/<script[\s\S]*?<\/script>/gi, " ")
-      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
       .replace(/<[^>]+>/g, "\n")
-      .replace(/&nbsp;/g, " ")
-      .replace(/&amp;/g, "&")
-      .replace(/&#39;/g, "'")
-      .replace(/&quot;/g, '"')
-      .replace(/\s+/g, " ")
+      .replace(/\n+/g, "\n")
       .trim();
 
-    const detected = [];
+    const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
 
-    const add = (part) => {
-      if (detected.length < 5) detected.push(part);
-    };
+    let weekTitle = "";
+    let bibleChapters = "";
+    let songs = [];
+    let studentParts = [];
+    let livingParts = [];
+    let treasuresTitle = "";
 
-    const countMatches = (regex) => {
-      const matches = text.match(regex);
-      return matches ? matches.length : 0;
-    };
+    lines.forEach(line => {
+      // WEEK TITLE
+      if (!weekTitle && line.match(/\b(MAYO|ABRIL|MARSO|APRIL|MAY)\b/i)) {
+        weekTitle = line;
+      }
 
-    const startingCount = countMatches(/pagpapasimula ng pakikipag-usap|starting a conversation/gi);
-    const followingCount = countMatches(/pakikipag-usap muli|following up|pagdalaw-muli/gi);
-    const makingCount = countMatches(/paggawa ng alagad|making disciples/gi);
-    const beliefCount = countMatches(/ipaliwanag.*paniniwala|explain.*belief/gi);
-    const talkCount = countMatches(/(?:^|\s)pahayag(?:\s|:)|talk/gi);
+      // BIBLE CHAPTERS
+      if (!bibleChapters && line.match(/ISAIA[S]?\s*\d+/i)) {
+        bibleChapters = line;
+      }
 
-    for (let i = 0; i < startingCount; i++) add("Starting a Conversation");
-    for (let i = 0; i < followingCount; i++) add("Following Up");
-    for (let i = 0; i < makingCount; i++) add("Making Disciples");
-    for (let i = 0; i < beliefCount; i++) add("Explain Your Belief");
-    for (let i = 0; i < talkCount; i++) add("Talk");
+      // SONGS
+      if (line.toLowerCase().includes("awit bilang")) {
+        const num = line.match(/\d+/);
+        if (num) songs.push(num[0]);
+      }
 
-    return Response.json({
-      weeks: [
-        {
-          studentParts: detected.slice(0, 5),
-          debug: {
-            startingCount,
-            followingCount,
-            makingCount,
-            beliefCount,
-            talkCount,
-          },
-        },
-      ],
+      // TREASURES TITLE
+      if (line.match(/^1\./)) {
+        treasuresTitle = line;
+      }
+
+      // STUDENT PARTS
+      if (
+        line.toLowerCase().includes("pagpapasimula") ||
+        line.toLowerCase().includes("pakikipag") ||
+        line.toLowerCase().includes("alagad") ||
+        line.toLowerCase().includes("paniniwala") ||
+        line.toLowerCase().includes("pahayag")
+      ) {
+        studentParts.push(line);
+      }
+
+      // CHRISTIAN LIVING
+      if (
+        line.includes("“") &&
+        line.includes("”") &&
+        line.match(/\d+\s*min/)
+      ) {
+        livingParts.push(line);
+      }
     });
-  } catch (error) {
-    return Response.json(
-      { error: "Failed to sync workbook", details: String(error) },
-      { status: 500 }
+
+    return new Response(
+      JSON.stringify({
+        weeks: [
+          {
+            weekTitle,
+            bibleChapters,
+            songs,
+            treasuresTitle,
+            studentParts,
+            livingParts,
+          },
+        ],
+      }),
+      {
+        headers: { "Content-Type": "application/json" },
+      }
     );
+
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 500,
+    });
   }
 }
