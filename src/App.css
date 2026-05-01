@@ -75,7 +75,8 @@ header p {
 .print-actions button,
 .print-toggle button,
 .workbook-box button,
-.sync-cell button {
+.sync-cell button,
+.bulk-sync-box button {
   border: 1px solid #94a3b8;
   background: #ffffff;
   color: #0f172a;
@@ -91,7 +92,8 @@ header p {
 .print-actions button:hover,
 .print-toggle button:hover,
 .workbook-box button:hover,
-.sync-cell button:hover {
+.sync-cell button:hover,
+.bulk-sync-box button:hover {
   background: #0f172a;
   color: #ffffff;
 }
@@ -215,12 +217,17 @@ textarea {
 }
 
 .wide-table {
-  min-width: 2600px;
+  min-width: 2850px;
 }
 
 .card table td input,
 .card table td select {
   width: 100%;
+}
+
+.av-export-card {
+  display: inline-block;
+  min-width: max-content;
 }
 
 .export-text-value {
@@ -234,13 +241,18 @@ textarea {
    THEOCRATIC STUDENT PART UI
 ========================================================= */
 
-.student-assignment-box {
+.student-assignment-box,
+.hall-assignment-box {
   display: grid;
   gap: 6px;
 }
 
-.part-title-input {
-  margin: 6px 0;
+.hall-assignment-box label {
+  font-size: 10px;
+  font-weight: 800;
+  color: #475569;
+  text-align: left;
+  margin-top: 3px;
 }
 
 .inactive {
@@ -265,7 +277,8 @@ textarea {
 }
 
 .workbook-box,
-.sync-box {
+.sync-box,
+.bulk-sync-box {
   border: 1px solid #dbe3ef;
   border-radius: 14px;
   padding: 12px;
@@ -353,85 +366,132 @@ textarea {
 }
 
 /* =========================================================
-   S-140 PRINTABLE DOCX-LIKE LAYOUT
+   FINAL PRINT LAYOUT
 ========================================================= */
 
 .s140-page {
   width: 8.5in;
-  min-height: 11in;
-  background: #ffffff;
-  color: #000000;
+  height: 11in;
+  background: white;
+  color: #000;
   margin: 0 auto 24px auto;
-  padding: 0.42in 0.55in;
+  padding: 0.34in 0.42in;
   font-family: Arial, sans-serif;
-  font-size: 12px;
-  line-height: 1.15;
+  font-size: 9.6px;
+  line-height: 1.12;
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.18);
+}
+
+.s140-page-double {
+  display: grid;
+  grid-template-rows: auto 1fr 1fr;
+  gap: 0.06in;
+}
+
+.s140-page-header {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  align-items: end;
+  border-bottom: 2px double #000;
+  padding-bottom: 2px;
+  margin-bottom: 5px;
+}
+
+.s140-page-header .s140-cong {
+  font-size: 9.3px;
+  font-weight: 800;
+}
+
+.s140-page-header .s140-main-title {
+  font-family: "Times New Roman", serif;
+  font-size: 18px;
+  font-weight: 800;
+  text-align: center;
 }
 
 .exact-docx-header,
 .s140-top-title {
-  display: grid;
-  grid-template-columns: 260px 1fr;
-  align-items: end;
-  border-bottom: 3px double #333;
-  padding-bottom: 3px;
-  margin-bottom: 14px;
+  display: none;
 }
 
-.s140-cong {
-  font-weight: 800;
-  font-size: 13px;
+.s140-schedule-block {
+  overflow: hidden;
+  padding-top: 2px;
+  min-height: 4.82in;
 }
 
-.s140-main-title {
-  font-family: "Times New Roman", Times, serif;
-  font-weight: 800;
-  font-size: 24px;
-  text-align: center;
+.s140-schedule-block + .s140-schedule-block {
+  margin-top: 0.05in;
 }
 
 .s140-week-line {
-  font-size: 13px;
+  font-size: 9.8px;
   font-weight: 800;
-  margin-bottom: 8px;
+  margin: 2px 0 3px;
 }
 
 .s140-top-assignments {
   display: grid;
-  grid-template-columns: 1fr 190px 230px;
-  row-gap: 6px;
-  margin-bottom: 12px;
-}
-
-.s140-role,
-.s140-role-inline {
-  font-weight: 800;
-  text-align: right;
-  padding-right: 8px;
-}
-
-.s140-name,
-.s140-name-inline {
-  font-size: 13px;
+  grid-template-columns: 1fr 145px 180px;
+  row-gap: 1px;
+  margin-bottom: 3px;
 }
 
 .s140-row {
   display: grid;
-  grid-template-columns: 55px 1fr 155px 230px;
+  grid-template-columns: 38px minmax(210px, 1fr) 105px 165px 165px;
   align-items: start;
-  min-height: 24px;
-  margin-bottom: 2px;
+  min-height: 15px;
+  margin-bottom: 1px;
+  column-gap: 5px;
+}
+
+.s140-row-normal {
+  grid-template-columns: 38px minmax(210px, 1fr) 105px 335px;
+}
+
+.s140-class-header {
+  display: grid;
+  grid-template-columns: 38px minmax(210px, 1fr) 105px 165px 165px;
+  font-size: 8.8px;
+  font-weight: 800;
+  margin-bottom: 1px;
+  column-gap: 5px;
 }
 
 .s140-time {
-  font-size: 11px;
-  color: #444444;
+  font-size: 8.6px;
+  text-align: right;
+  padding-right: 5px;
+  color: #333;
+  line-height: 1.18;
 }
 
 .s140-part {
-  font-size: 12px;
   font-weight: 800;
+  font-size: 9.4px;
+  line-height: 1.16;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.s140-role,
+.s140-role-inline {
+  text-align: right;
+  padding-right: 5px;
+  font-weight: 800;
+  font-size: 8.7px;
+  line-height: 1.16;
+}
+
+.s140-name,
+.s140-name-inline {
+  font-size: 9px;
+  line-height: 1.32;
+  font-weight: 800;
+  overflow-wrap: normal;
+  word-break: normal;
+  white-space: normal;
 }
 
 .italic-bold {
@@ -440,57 +500,36 @@ textarea {
 }
 
 .s140-section {
-  color: #ffffff;
+  font-size: 9px;
   font-weight: 800;
-  font-size: 12px;
-  padding: 4px 8px;
-  margin: 8px 0 4px 0;
+  padding: 2px 6px;
+  margin: 4px 0 2px;
+  color: #fff;
+  line-height: 1.05;
 }
 
-.s140-blue {
-  background: #4f4f4f;
-}
-
-.s140-gold {
-  background: #c99a00;
-}
-
-.s140-red {
-  background: #8b0030;
-}
-
-.s140-class-header {
-  display: grid;
-  grid-template-columns: 55px 1fr 155px 230px;
-  font-weight: 800;
-  font-size: 11px;
-  margin-bottom: 4px;
-}
+.s140-blue { background: #4a4a4a; }
+.s140-gold { background: #c89c00; }
+.s140-red { background: #7a0026; }
 
 .ministry-row {
-  min-height: 34px;
+  min-height: 28px;
 }
 
 .s140-footer {
-  margin-top: 14px;
-  font-size: 9px;
-  color: #444444;
+  font-size: 7.5px;
+  margin-top: 4px;
+  color: #444;
 }
 
-.s140-no-meeting {
-  text-align: center;
-  margin-top: 160px;
-}
-
+.s140-no-meeting,
 .no-meeting-print {
   text-align: center;
-  padding: 80px 0;
+  margin-top: 80px;
 }
 
-.bethel-table,
-.docx-schedule-table {
-  width: 100%;
-  border-collapse: collapse;
+.s140-row > div {
+  padding-bottom: 1px;
 }
 
 /* =========================================================
@@ -550,8 +589,32 @@ textarea {
     box-shadow: none;
     margin: 0;
     width: 8.5in;
-    min-height: 11in;
+    height: 11in;
     page-break-after: always;
     transform: none;
   }
+
+  .s140-page-double {
+    display: grid;
+    grid-template-rows: auto 1fr 1fr;
+  }
+}
+
+
+/* =========================================================
+   SINGLE S-140 FOOTER PER PRINTED PAGE
+========================================================= */
+
+.s140-page {
+  position: relative;
+}
+
+.s140-page-footer {
+  position: absolute;
+  bottom: 12px;
+  left: 16px;
+  font-size: 7.5px;
+  color: #444;
+  font-family: Arial, sans-serif;
+  letter-spacing: 0.3px;
 }

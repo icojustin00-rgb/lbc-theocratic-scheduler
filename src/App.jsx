@@ -58,6 +58,7 @@ const SOUND_TEAM = [
   "Eugene Masangkay",
   "Kian Ogoy",
   "Guillaume Arenas",
+  "Clarence Umotoy",
 ];
 
 const AV_NOTES_OPTIONS = [
@@ -419,7 +420,6 @@ function makeAVRows(monthValue) {
     micRoving1: "",
     micRoving2: "",
     stagePlatform: "",
-    attendant: "",
     notes: row.meeting,
   }));
 }
@@ -433,12 +433,13 @@ function makeTheocraticRows(monthValue) {
         workbookUrl: "",
         syncStatus: "",
         bibleReading: "",
+        bibleReadingAdditional: "",
         studentParts: [
-          { type: "Pagpapasimula ng Pakikipag-usap", title: "Pagpapasimula ng Pakikipag-usap", time: "", minutes: "", publisher: "", partnerPublisher: "" },
-          { type: "Pakikipag-usap Muli", title: "Pakikipag-usap Muli", time: "", minutes: "", publisher: "", partnerPublisher: "" },
-          { type: "Paggawa ng mga Alagad", title: "Paggawa ng mga Alagad", time: "", minutes: "", publisher: "", partnerPublisher: "" },
-          { type: index === 0 ? "Pahayag" : "", title: index === 0 ? "Pahayag" : "", time: "", minutes: "", publisher: "", partnerPublisher: "" },
-          { type: "", title: "", time: "", minutes: "", publisher: "", partnerPublisher: "" },
+          { type: "Pagpapasimula ng Pakikipag-usap", title: "Pagpapasimula ng Pakikipag-usap", time: "", minutes: "", publisher: "", partnerPublisher: "", additionalPublisher: "", additionalPartnerPublisher: "" },
+          { type: "Pakikipag-usap Muli", title: "Pakikipag-usap Muli", time: "", minutes: "", publisher: "", partnerPublisher: "", additionalPublisher: "", additionalPartnerPublisher: "" },
+          { type: "Paggawa ng mga Alagad", title: "Paggawa ng mga Alagad", time: "", minutes: "", publisher: "", partnerPublisher: "", additionalPublisher: "", additionalPartnerPublisher: "" },
+          { type: index === 0 ? "Pahayag" : "", title: index === 0 ? "Pahayag" : "", time: "", minutes: "", publisher: "", partnerPublisher: "", additionalPublisher: "", additionalPartnerPublisher: "" },
+          { type: "", title: "", time: "", minutes: "", publisher: "", partnerPublisher: "", additionalPublisher: "", additionalPartnerPublisher: "" },
         ],
         workbook: {
           weekTitle: "",
@@ -531,6 +532,8 @@ function buildStudentPartsFromWorkbook(week) {
         minutes: "",
         publisher: "",
         partnerPublisher: "",
+        additionalPublisher: "",
+        additionalPartnerPublisher: "",
       };
     }
 
@@ -542,6 +545,8 @@ function buildStudentPartsFromWorkbook(week) {
         minutes: "",
         publisher: "",
         partnerPublisher: "",
+        additionalPublisher: "",
+        additionalPartnerPublisher: "",
       };
     }
 
@@ -708,18 +713,33 @@ function BalanceCard({ name, total, lastDate, lastPart }) {
    ========================================================= */
 
 function PrintableSchedule({ rows }) {
-  const formatStudentNames = (part) => {
+  const rowsPerPage = 2;
+
+  const pages = rows.reduce((result, row, index) => {
+    if (index % rowsPerPage === 0) {
+      result.push([]);
+    }
+    result[result.length - 1].push(row);
+    return result;
+  }, []);
+
+  const formatStudentNames = (part, hall = "main") => {
     if (!part) return "";
 
-    if (needsPartner(part.type)) {
-      const first = part.publisher || "";
-      const second = part.partnerPublisher || "";
+    const first =
+      hall === "additional" ? part.additionalPublisher || "" : part.publisher || "";
 
+    const second =
+      hall === "additional"
+        ? part.additionalPartnerPublisher || ""
+        : part.partnerPublisher || "";
+
+    if (needsPartner(part.type)) {
       if (first && second) return `${first} / ${second}`;
       return first || second;
     }
 
-    return part.publisher || "";
+    return first;
   };
 
   const ministryRows = (row) =>
@@ -730,9 +750,160 @@ function PrintableSchedule({ rows }) {
         time: part.time || "",
         title: part.title || part.type,
         label: needsPartner(part.type) ? "Estudyante/Assistant:" : "Estudyante:",
-        mainHall: formatStudentNames(part),
-        additionalClass: "",
+        mainHall: formatStudentNames(part, "main"),
+        additionalClass: formatStudentNames(part, "additional"),
       }));
+
+  const renderSchedule = (row, index) => {
+    const openingSong = row.workbook?.openingSong || row.workbook?.songs?.opening || "";
+    const middleSong = row.workbook?.middleSong || row.workbook?.songs?.middle || "";
+    const closingSong = row.workbook?.closingSong || row.workbook?.songs?.closing || "";
+    const bibleChapters = row.workbook?.bibleChapters || "";
+    const firstLivingPart =
+      row.workbook?.livingParts?.[0] || "Pamumuhay Bilang Kristiyano";
+    const hasNoMeeting = row.meetingStatus && row.meetingStatus !== "normal";
+
+    return (
+      <div key={`${row.date}-${index}`} className="s140-schedule-block">
+        <div className="s140-week-line">
+          {(row.tagalogDate || row.date).toUpperCase()}{" "}
+          {bibleChapters ? `| ${bibleChapters}` : ""}
+        </div>
+
+        <div className="s140-top-assignments">
+          <div></div>
+          <div className="s140-role">Chairman:</div>
+          <div className="s140-name">{row.chairman}</div>
+
+          <div></div>
+          <div className="s140-role">Tagapayo sa Karagdagang Klase:</div>
+          <div className="s140-name">{row.additionalClassCounselor}</div>
+        </div>
+
+        {hasNoMeeting ? (
+          <div className="s140-no-meeting">
+            <h2>WALANG PULONG SA GITNANG SANLINGGO</h2>
+            <p>{getStatusLabel(row.meetingStatus)}</p>
+          </div>
+        ) : (
+          <>
+            <div className="s140-row s140-row-normal">
+              <div className="s140-time">7:00</div>
+              <div className="s140-part italic-bold">Awit Bilang {openingSong}</div>
+              <div className="s140-role-inline">Panalangin:</div>
+              <div className="s140-name-inline" data-hall="main">{row.openingPrayer}</div>
+            </div>
+
+            <div className="s140-row s140-row-normal">
+              <div className="s140-time">{row.workbook?.openingCommentTime || "7:05"}</div>
+              <div className="s140-part">Pambungad na Komento&nbsp; (1 min.)</div>
+              <div></div>
+              <div></div>
+            </div>
+
+            <div className="s140-section s140-blue">KAYAMANAN MULA SA SALITA NG DIYOS</div>
+
+            <div className="s140-class-header">
+              <div></div>
+              <div></div>
+              <div></div>
+              <div>{getAdditionalClassLabel(row.additionalClassGroups)}</div>
+              <div>Main Hall</div>
+            </div>
+
+            <div className="s140-row">
+              <div className="s140-time">{row.workbook?.treasuresTime || "7:06"}</div>
+              <div className="s140-part">
+                1. {row.workbook?.treasuresTitle || "Kayamanan sa Salita ng Diyos"}&nbsp; (10 min.)
+              </div>
+              <div></div>
+              <div></div>
+              <div className="s140-name-inline">{row.treasuresTalk}</div>
+            </div>
+
+            <div className="s140-row">
+              <div className="s140-time">{row.workbook?.gemsTime || "7:16"}</div>
+              <div className="s140-part">2. Espirituwal na Hiyas&nbsp; (10 min.)</div>
+              <div></div>
+              <div></div>
+              <div className="s140-name-inline">{row.spiritualGems}</div>
+            </div>
+
+            <div className="s140-row">
+              <div className="s140-time">{row.workbook?.bibleReadingTime || "7:26"}</div>
+              <div className="s140-part">3. Pagbabasa ng Bibliya&nbsp; (4 min.)</div>
+              <div className="s140-role-inline">Estudyante:</div>
+              <div className="s140-name-inline">{row.bibleReadingAdditional}</div>
+              <div className="s140-name-inline">{row.bibleReading}</div>
+            </div>
+
+            <div className="s140-section s140-gold">MAGING MAHUSAY SA MINISTERYO</div>
+
+            <div className="s140-class-header">
+              <div></div>
+              <div></div>
+              <div></div>
+              <div>{getAdditionalClassLabel(row.additionalClassGroups)}</div>
+              <div>Main Hall</div>
+            </div>
+
+            {ministryRows(row).map((part, partIndex) => (
+              <div className="s140-row ministry-row" key={`${row.date}-ministry-${partIndex}`}>
+                <div className="s140-time">{part.time}</div>
+                <div className="s140-part">
+                  {part.number}. {part.title}
+                </div>
+                <div className="s140-role-inline">{part.label}</div>
+                <div className="s140-name-inline">{part.additionalClass}</div>
+                <div className="s140-name-inline">{part.mainHall}</div>
+              </div>
+            ))}
+
+            <div className="s140-section s140-red">PAMUMUHAY BILANG KRISTIYANO</div>
+
+            <div className="s140-row s140-row-normal">
+              <div className="s140-time">{row.workbook?.livingSongTime || "7:47"}</div>
+              <div className="s140-part italic-bold">Awit Bilang {middleSong}</div>
+              <div></div>
+              <div></div>
+            </div>
+
+            <div className="s140-row s140-row-normal">
+              <div className="s140-time">{row.workbook?.livingStartTime || "7:52"}</div>
+              <div className="s140-part">{firstLivingPart}</div>
+              <div></div>
+              <div className="s140-name-inline">{row.livingAsChristians}</div>
+            </div>
+
+            <div className="s140-row s140-row-normal">
+              <div className="s140-time">{row.workbook?.cbsTime || "8:07"}</div>
+              <div className="s140-part">Pag-aaral ng Kongregasyon sa Bibliya&nbsp; (30 min.)</div>
+              <div className="s140-role-inline">Konduktor/Tagabasa:</div>
+              <div className="s140-name-inline">
+                {row.cbs}
+                {row.reader ? ` / ${row.reader}` : ""}
+              </div>
+            </div>
+
+            <div className="s140-row s140-row-normal">
+              <div className="s140-time">{row.workbook?.closingCommentsTime || "8:37"}</div>
+              <div className="s140-part">Pangwakas na Komento&nbsp; (3 min.)</div>
+              <div></div>
+              <div className="s140-name-inline">{row.chairman}</div>
+            </div>
+
+            <div className="s140-row s140-row-normal">
+              <div className="s140-time">{row.workbook?.closingSongTime || "8:40"}</div>
+              <div className="s140-part italic-bold">Awit Bilang {closingSong}</div>
+              <div className="s140-role-inline">Panalangin:</div>
+              <div className="s140-name-inline">{row.closingPrayer}</div>
+            </div>
+
+          </>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="printable-area">
@@ -740,154 +911,20 @@ function PrintableSchedule({ rows }) {
         <button onClick={() => window.print()}>Print / Save as PDF</button>
       </div>
 
-      {rows.map((row, index) => {
-        const openingSong = row.workbook?.openingSong || row.workbook?.songs?.opening || "";
-        const middleSong = row.workbook?.middleSong || row.workbook?.songs?.middle || "";
-        const closingSong = row.workbook?.closingSong || row.workbook?.songs?.closing || "";
-        const bibleChapters = row.workbook?.bibleChapters || "";
-        const firstLivingPart = row.workbook?.livingParts?.[0] || "Pamumuhay Bilang Kristiyano";
-        const hasNoMeeting = row.meetingStatus && row.meetingStatus !== "normal";
-
-        return (
-          <div key={`${row.date}-${index}`} className="s140-page">
-            <div className="s140-top-title exact-docx-header">
-              <div className="s140-cong">LITTLE BAGUIO CONGREGATION</div>
-              <div className="s140-main-title">Iskedyul ng Pulong sa Gitnang Sanlinggo</div>
-            </div>
-
-            <div className="s140-week-line">
-              {row.date.toUpperCase()} {bibleChapters ? `| ${bibleChapters}` : ""}
-            </div>
-
-            <div className="s140-top-assignments">
-              <div></div>
-              <div className="s140-role">Chairman:</div>
-              <div className="s140-name">{row.chairman}</div>
-
-              <div></div>
-              <div className="s140-role">Tagapayo sa Karagdagang Klase:</div>
-              <div className="s140-name"></div>
-            </div>
-
-            {hasNoMeeting ? (
-              <div className="s140-no-meeting">
-                <h2>WALANG PULONG SA GITNANG SANLINGGO</h2>
-                <p>{getStatusLabel(row.meetingStatus)}</p>
-              </div>
-            ) : (
-              <>
-                <div className="s140-row">
-                  <div className="s140-time">7:00</div>
-                  <div className="s140-part italic-bold">Awit Bilang {openingSong}</div>
-                  <div className="s140-role-inline">Panalangin:</div>
-                  <div className="s140-name-inline">{row.openingPrayer}</div>
-                </div>
-
-                <div className="s140-row">
-                  <div className="s140-time">{row.workbook?.openingCommentTime || "7:05"}</div>
-                  <div className="s140-part">Pambungad na Komento&nbsp; (1 min.)</div>
-                  <div></div>
-                  <div></div>
-                </div>
-
-                <div className="s140-section s140-blue">KAYAMANAN MULA SA SALITA NG DIYOS</div>
-
-                <div className="s140-class-header">
-                  <div></div>
-                  <div></div>
-                  <div>{getAdditionalClassLabel(row.additionalClassGroups)}</div>
-                  <div>Main Hall</div>
-                </div>
-
-                <div className="s140-row">
-                  <div className="s140-time">{row.workbook?.treasuresTime || "7:06"}</div>
-                  <div className="s140-part">
-                    1. {row.workbook?.treasuresTitle || "Kayamanan sa Salita ng Diyos"}&nbsp; (10 min.)
-                  </div>
-                  <div className="s140-name-inline"></div>
-                  <div className="s140-name-inline">{row.treasuresTalk}</div>
-                </div>
-
-                <div className="s140-row">
-                  <div className="s140-time">{row.workbook?.gemsTime || "7:16"}</div>
-                  <div className="s140-part">2. Espirituwal na Hiyas&nbsp; (10 min.)</div>
-                  <div className="s140-name-inline"></div>
-                  <div className="s140-name-inline">{row.spiritualGems}</div>
-                </div>
-
-                <div className="s140-row">
-                  <div className="s140-time">{row.workbook?.bibleReadingTime || "7:26"}</div>
-                  <div className="s140-part">3. Pagbabasa ng Bibliya&nbsp; (4 min.)</div>
-                  <div className="s140-role-inline">Estudyante:</div>
-                  <div className="s140-name-inline">{row.bibleReading}</div>
-                </div>
-
-                <div className="s140-section s140-gold">MAGING MAHUSAY SA MINISTERYO</div>
-
-                <div className="s140-class-header">
-                  <div></div>
-                  <div></div>
-                  <div>{getAdditionalClassLabel(row.additionalClassGroups)}</div>
-                  <div>Main Hall</div>
-                </div>
-
-                {ministryRows(row).map((part, partIndex) => (
-                  <div className="s140-row ministry-row" key={`${row.date}-ministry-${partIndex}`}>
-                    <div className="s140-time">{part.time}</div>
-                    <div className="s140-part">
-                      {part.number}. {part.title}
-                    </div>
-                    <div className="s140-role-inline">{part.label}</div>
-                    <div className="s140-name-inline">{part.mainHall}</div>
-                  </div>
-                ))}
-
-                <div className="s140-section s140-red">PAMUMUHAY BILANG KRISTIYANO</div>
-
-                <div className="s140-row">
-                  <div className="s140-time">{row.workbook?.livingSongTime || "7:47"}</div>
-                  <div className="s140-part italic-bold">Awit Bilang {middleSong}</div>
-                  <div></div>
-                  <div></div>
-                </div>
-
-                <div className="s140-row">
-                  <div className="s140-time">{row.workbook?.livingStartTime || "7:52"}</div>
-                  <div className="s140-part">{firstLivingPart}</div>
-                  <div></div>
-                  <div className="s140-name-inline">{row.livingAsChristians}</div>
-                </div>
-
-                <div className="s140-row">
-                  <div className="s140-time">{row.workbook?.cbsTime || "8:07"}</div>
-                  <div className="s140-part">Pag-aaral ng Kongregasyon sa Bibliya&nbsp; (30 min.)</div>
-                  <div className="s140-role-inline">Konduktor/Tagabasa:</div>
-                  <div className="s140-name-inline">
-                    {row.cbs}
-                    {row.reader ? ` / ${row.reader}` : ""}
-                  </div>
-                </div>
-
-                <div className="s140-row">
-                  <div className="s140-time">{row.workbook?.closingCommentsTime || "8:37"}</div>
-                  <div className="s140-part">Pangwakas na Komento&nbsp; (3 min.)</div>
-                  <div></div>
-                  <div className="s140-name-inline">{row.chairman}</div>
-                </div>
-
-                <div className="s140-row">
-                  <div className="s140-time">{row.workbook?.closingSongTime || "8:40"}</div>
-                  <div className="s140-part italic-bold">Awit Bilang {closingSong}</div>
-                  <div className="s140-role-inline">Panalangin:</div>
-                  <div className="s140-name-inline">{row.closingPrayer}</div>
-                </div>
-
-                <div className="s140-footer">S-140-TG&nbsp;&nbsp; 05/26</div>
-              </>
-            )}
+      {pages.map((pageRows, pageIndex) => (
+        <div key={`print-page-${pageIndex}`} className="s140-page s140-page-double">
+          <div className="s140-page-header">
+            <div className="s140-cong">LITTLE BAGUIO CONGREGATION</div>
+            <div className="s140-main-title">Iskedyul ng Pulong sa Gitnang Sanlinggo</div>
           </div>
-        );
-      })}
+
+          {pageRows.map((row, rowIndex) => renderSchedule(row, rowIndex))}
+
+          <div className="s140-page-footer">
+            S-140-TG&nbsp;&nbsp; 05/26
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -912,6 +949,25 @@ function AVScheduler() {
         rowIndex === index ? { ...row, [field]: value } : row
       )
     );
+  };
+
+  const handleBulkSync = async () => {
+    const links = bulkLinks
+      .split(/\n|,|;/)
+      .map((link) => link.trim())
+      .filter(Boolean);
+
+    if (!links.length) {
+      alert("Paste at least one workbook link.");
+      return;
+    }
+
+    for (let index = 0; index < links.length; index += 1) {
+      if (!rows[index]) break;
+      await syncWorkbookRow(index, links[index]);
+    }
+
+    alert("Bulk sync complete. Please review the detected parts.");
   };
 
   const autoFill = () => {
@@ -965,10 +1021,18 @@ function AVScheduler() {
       replacements.push({ control, span });
     });
 
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "visible";
+
     try {
       const canvas = await html2canvas(avTableRef.current, {
         backgroundColor: "#ffffff",
         scale: 2,
+        useCORS: true,
+        scrollX: 0,
+        scrollY: -window.scrollY,
+        windowWidth: avTableRef.current.scrollWidth,
+        windowHeight: avTableRef.current.scrollHeight,
       });
 
       const link = document.createElement("a");
@@ -976,6 +1040,8 @@ function AVScheduler() {
       link.href = canvas.toDataURL("image/png");
       link.click();
     } finally {
+      document.body.style.overflow = originalOverflow;
+
       replacements.forEach(({ control, span }) => {
         control.style.display = "";
         span.remove();
@@ -993,7 +1059,6 @@ function AVScheduler() {
         mic1: 0,
         mic2: 0,
         stage: 0,
-        attendant: 0,
         total: 0,
       };
     });
@@ -1010,7 +1075,6 @@ function AVScheduler() {
       add(row.micRoving1, "mic1");
       add(row.micRoving2, "mic2");
       add(row.stagePlatform, "stage");
-      add(row.attendant, "attendant");
     });
 
     return Object.values(map).sort(
@@ -1041,7 +1105,7 @@ function AVScheduler() {
           {
             label: "AV Table",
             content: (
-              <div className="card scroll" ref={avTableRef}>
+              <div className="card scroll av-export-card" ref={avTableRef}>
                 <h2>{title}</h2>
 
                 <table>
@@ -1052,7 +1116,6 @@ function AVScheduler() {
                       <th>Mic Roving 1</th>
                       <th>Mic Roving 2</th>
                       <th>Stage Platform</th>
-                      <th>Attendant</th>
                       <th>Notes</th>
                     </tr>
                   </thead>
@@ -1107,14 +1170,6 @@ function AVScheduler() {
                           />
                         </td>
                         <td>
-                          <input
-                            value={row.attendant}
-                            onChange={(e) =>
-                              updateRow(index, "attendant", e.target.value)
-                            }
-                          />
-                        </td>
-                        <td>
                           <SelectCell
                             value={row.notes}
                             list={AV_NOTES_OPTIONS}
@@ -1142,7 +1197,6 @@ function AVScheduler() {
                       <th>Mic 1</th>
                       <th>Mic 2</th>
                       <th>Stage</th>
-                      <th>Attendant</th>
                       <th>Total</th>
                     </tr>
                   </thead>
@@ -1155,7 +1209,6 @@ function AVScheduler() {
                         <td>{item.mic1}</td>
                         <td>{item.mic2}</td>
                         <td>{item.stage}</td>
-                        <td>{item.attendant}</td>
                         <td>
                           <strong>{item.total}</strong>
                         </td>
@@ -1182,6 +1235,7 @@ function TheocraticScheduler() {
   const [rows, setRows] = useState(() => makeTheocraticRows("2026-04"));
   const [workbookPaste, setWorkbookPaste] = useState({});
   const [showPrintable, setShowPrintable] = useState(false);
+  const [bulkLinks, setBulkLinks] = useState("");
   const [appointedSearch, setAppointedSearch] = useState("");
   const [publisherSearch, setPublisherSearch] = useState("");
 
@@ -1215,6 +1269,7 @@ function TheocraticScheduler() {
 
             if (!needsPartner(value)) {
               updatedPart.partnerPublisher = "";
+              updatedPart.additionalPartnerPublisher = "";
             }
           }
 
@@ -1259,9 +1314,9 @@ function TheocraticScheduler() {
     );
   };
 
-  const syncWorkbookRow = async (rowIndex) => {
+  const syncWorkbookRow = async (rowIndex, optionalUrl = "") => {
     const row = rows[rowIndex];
-    const url = row?.workbookUrl?.trim();
+    const url = optionalUrl.trim() || row?.workbookUrl?.trim();
 
     if (row?.meetingStatus && row.meetingStatus !== "normal") {
       setRows((current) =>
@@ -1382,6 +1437,25 @@ function TheocraticScheduler() {
     }
   };
 
+  const handleBulkSync = async () => {
+    const links = bulkLinks
+      .split(/\n|,|;/)
+      .map((link) => link.trim())
+      .filter(Boolean);
+
+    if (!links.length) {
+      alert("Paste at least one workbook link.");
+      return;
+    }
+
+    for (let index = 0; index < links.length; index += 1) {
+      if (!rows[index]) break;
+      await syncWorkbookRow(index, links[index]);
+    }
+
+    alert("Bulk sync complete. Please review the detected parts.");
+  };
+
   const autoFill = () => {
     setRows((current) =>
       current.map((row) => {
@@ -1415,9 +1489,19 @@ function TheocraticScheduler() {
           usedPublishers.add(bibleReader);
         }
 
+        const additionalBibleReader = shuffle(PUBLISHERS).find(
+          (name) => !usedPublishers.has(name)
+        );
+
+        next.bibleReadingAdditional = additionalBibleReader || "";
+
+        if (additionalBibleReader) {
+          usedPublishers.add(additionalBibleReader);
+        }
+
         next.studentParts = next.studentParts.map((part) => {
           if (!part.type) {
-            return { ...part, publisher: "", partnerPublisher: "" };
+            return { ...part, publisher: "", partnerPublisher: "", additionalPublisher: "", additionalPartnerPublisher: "" };
           }
 
           const publisher = shuffle(PUBLISHERS).find(
@@ -1438,10 +1522,30 @@ function TheocraticScheduler() {
             }
           }
 
+          const additionalPublisher =
+            shuffle(PUBLISHERS).find((name) => !usedPublishers.has(name)) || "";
+
+          if (additionalPublisher) {
+            usedPublishers.add(additionalPublisher);
+          }
+
+          let additionalPartnerPublisher = "";
+
+          if (needsPartner(part.type)) {
+            additionalPartnerPublisher =
+              shuffle(PUBLISHERS).find((name) => !usedPublishers.has(name)) || "";
+
+            if (additionalPartnerPublisher) {
+              usedPublishers.add(additionalPartnerPublisher);
+            }
+          }
+
           return {
             ...part,
             publisher: publisher || "",
             partnerPublisher,
+            additionalPublisher,
+            additionalPartnerPublisher,
           };
         });
 
@@ -1453,7 +1557,7 @@ function TheocraticScheduler() {
   const clear = () => {
     setRows((current) =>
       current.map((row) => {
-        const next = { ...row, bibleReading: "" };
+        const next = { ...row, bibleReading: "", bibleReadingAdditional: "" };
 
         APPOINTED_FIELDS.forEach(([field]) => {
           next[field] = "";
@@ -1463,6 +1567,8 @@ function TheocraticScheduler() {
           ...part,
           publisher: "",
           partnerPublisher: "",
+          additionalPublisher: "",
+          additionalPartnerPublisher: "",
         }));
 
         return next;
@@ -1554,9 +1660,18 @@ function TheocraticScheduler() {
         map[row.bibleReading].lastPart = "Pagbabasa ng Bibliya";
       }
 
+      if (row.bibleReadingAdditional && map[row.bibleReadingAdditional]) {
+        map[row.bibleReadingAdditional].bibleReading += 1;
+        map[row.bibleReadingAdditional].total += 1;
+        map[row.bibleReadingAdditional].lastDate = row.tagalogDate || row.date;
+        map[row.bibleReadingAdditional].lastPart = "Pagbabasa ng Bibliya (Karagdagang Klase)";
+      }
+
       row.studentParts.forEach((part) => {
         addStudentPart(part.publisher, part.type, row.tagalogDate || row.date);
         addStudentPart(part.partnerPublisher, part.type, row.tagalogDate || row.date);
+        addStudentPart(part.additionalPublisher, part.type, row.tagalogDate || row.date);
+        addStudentPart(part.additionalPartnerPublisher, part.type, row.tagalogDate || row.date);
       });
     });
 
@@ -1622,6 +1737,19 @@ function TheocraticScheduler() {
             label: "Parts Table",
             content: (
               <div className="card scroll">
+                <div className="bulk-sync-box">
+                  <h3>Bulk Sync (Multiple Weeks)</h3>
+                  <p className="helper-text">
+                    Paste multiple JW workbook links, one per line. They will sync in order from the first Thursday row downward.
+                  </p>
+                  <textarea
+                    value={bulkLinks}
+                    onChange={(e) => setBulkLinks(e.target.value)}
+                    placeholder="Paste one JW workbook link per line..."
+                  />
+                  <button onClick={handleBulkSync}>Sync All Weeks</button>
+                </div>
+
                 <h2>{title}</h2>
 
                 <table className="wide-table">
@@ -1630,6 +1758,7 @@ function TheocraticScheduler() {
                       <th>Date</th>
                       <th>Status</th>
                       <th>Karagdagang Klase</th>
+                      <th>Tagapayo sa Karagdagang Klase</th>
                       <th>Workbook Link</th>
 
                       {APPOINTED_FIELDS.map(([, label]) => (
@@ -1683,6 +1812,22 @@ function TheocraticScheduler() {
                           </select>
                         </td>
 
+                        <td>
+                          <select
+                            value={row.additionalClassCounselor || ""}
+                            onChange={(e) =>
+                              updateRow(rowIndex, "additionalClassCounselor", e.target.value)
+                            }
+                          >
+                            <option value=""></option>
+                            {ELDERS.map((name) => (
+                              <option key={name} value={name}>
+                                {name}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+
                         <td className="sync-cell">
                           <input
                             value={row.workbookUrl || ""}
@@ -1714,16 +1859,31 @@ function TheocraticScheduler() {
                         ))}
 
                         <td>
-                          <PublisherSelect
-                            value={row.bibleReading}
-                            onChange={(e) =>
-                              updateRow(
-                                rowIndex,
-                                "bibleReading",
-                                e.target.value
-                              )
-                            }
-                          />
+                          <div className="hall-assignment-box">
+                            <label>Karagdagang Klase</label>
+                            <PublisherSelect
+                              value={row.bibleReadingAdditional || ""}
+                              onChange={(e) =>
+                                updateRow(
+                                  rowIndex,
+                                  "bibleReadingAdditional",
+                                  e.target.value
+                                )
+                              }
+                            />
+
+                            <label>Main Hall</label>
+                            <PublisherSelect
+                              value={row.bibleReading}
+                              onChange={(e) =>
+                                updateRow(
+                                  rowIndex,
+                                  "bibleReading",
+                                  e.target.value
+                                )
+                              }
+                            />
+                          </div>
                         </td>
 
                         {row.studentParts.map((part, partIndex) => (
@@ -1751,7 +1911,35 @@ function TheocraticScheduler() {
                             </select>
 
                             {part.type ? (
-                              <div className="student-assignment-box">
+                              <div className="hall-assignment-box">
+                                <label>Karagdagang Klase</label>
+                                <PublisherSelect
+                                  value={part.additionalPublisher || ""}
+                                  onChange={(e) =>
+                                    updateStudentPart(
+                                      rowIndex,
+                                      partIndex,
+                                      "additionalPublisher",
+                                      e.target.value
+                                    )
+                                  }
+                                />
+
+                                {needsPartner(part.type) ? (
+                                  <PublisherSelect
+                                    value={part.additionalPartnerPublisher || ""}
+                                    onChange={(e) =>
+                                      updateStudentPart(
+                                        rowIndex,
+                                        partIndex,
+                                        "additionalPartnerPublisher",
+                                        e.target.value
+                                      )
+                                    }
+                                  />
+                                ) : null}
+
+                                <label>Main Hall</label>
                                 <PublisherSelect
                                   value={part.publisher}
                                   onChange={(e) =>
