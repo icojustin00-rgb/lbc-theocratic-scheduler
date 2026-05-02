@@ -618,3 +618,138 @@ textarea {
   font-family: Arial, sans-serif;
   letter-spacing: 0.3px;
 }
+
+
+
+
+/* =========================================================
+   CUSTOM SEARCHABLE DROPDOWN / COMBOBOX
+========================================================= */
+
+.custom-combobox {
+  position: relative;
+  width: 100%;
+  min-width: 170px;
+}
+
+.combo-display {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  border-radius: 8px;
+  padding: 7px 8px;
+  font-size: 13px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 34px;
+  text-align: left;
+}
+
+.combo-display:hover {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.combo-arrow {
+  font-size: 11px;
+  color: #64748b;
+  margin-left: 6px;
+}
+
+.combo-panel {
+  position: absolute;
+  z-index: 9999;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 280px;
+  max-height: 340px;
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid #94a3b8;
+  border-radius: 12px;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.22);
+  padding: 8px;
+  text-align: left;
+}
+
+.combo-search {
+  width: 100%;
+  margin-bottom: 6px;
+  font-size: 12px;
+  padding: 7px 8px;
+}
+
+.combo-clear {
+  width: 100%;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+  border-radius: 8px;
+  padding: 6px 8px;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+
+.combo-clear:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.combo-options {
+  max-height: 250px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.combo-group {
+  margin-bottom: 6px;
+}
+
+.combo-group-label {
+  position: sticky;
+  top: 0;
+  background: #f1f5f9;
+  color: #334155;
+  font-weight: 800;
+  font-size: 11px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  margin-bottom: 3px;
+}
+
+.combo-option {
+  width: 100%;
+  display: block;
+  border: none;
+  background: #ffffff;
+  color: #0f172a;
+  text-align: left;
+  padding: 6px 7px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.combo-option:hover,
+.combo-option.selected {
+  background: #dbeafe;
+  color: #1e3a8a;
+}
+
+.combo-empty {
+  padding: 10px;
+  color: #64748b;
+  font-size: 12px;
+  text-align: center;
+}
+
+/* Prevent table clipping the custom dropdown */
+.card.scroll {
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+.card td {
+  position: relative;
+}

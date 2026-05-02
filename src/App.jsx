@@ -58,7 +58,6 @@ const SOUND_TEAM = [
   "Eugene Masangkay",
   "Kian Ogoy",
   "Guillaume Arenas",
-  "Clarence Umotoy",
 ];
 
 const AV_NOTES_OPTIONS = [
@@ -103,6 +102,7 @@ const MINISTERIALS = [
   "Jundy Raga",
   "Justin Ico",
   "Kian Ogoy",
+  "Jedrey Soriano",
 ];
 
 const APPOINTED_BROTHERS = [...ELDERS, ...MINISTERIALS];
@@ -255,6 +255,16 @@ const PUBLISHER_GROUPS = {
 };
 
 const PUBLISHERS = Object.values(PUBLISHER_GROUPS).flat();
+
+const ALL_ASSIGNMENT_NAMES = Array.from(
+  new Set([...ELDERS, ...MINISTERIALS, ...PUBLISHERS])
+);
+
+const COMBINED_ASSIGNMENT_GROUPS = {
+  Elders: ELDERS,
+  "Ministerial Servants": MINISTERIALS,
+  ...PUBLISHER_GROUPS,
+};
 
 const APPOINTED_FIELDS = [
   ["chairman", "Chairman"],
@@ -673,21 +683,89 @@ function TheocraticSelect({ value, onChange }) {
   );
 }
 
-function PublisherSelect({ value, onChange }) {
-  return (
-    <select value={value || ""} onChange={onChange}>
-      <option value=""></option>
+function PublisherSelect({ value, onChange, includeAppointed = true }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
 
-      {Object.entries(PUBLISHER_GROUPS).map(([group, names]) => (
-        <optgroup key={group} label={group}>
-          {names.map((name) => (
-            <option key={`${group}-${name}`} value={name}>
-              {name}
-            </option>
-          ))}
-        </optgroup>
-      ))}
-    </select>
+  const sourceGroups = includeAppointed
+    ? COMBINED_ASSIGNMENT_GROUPS
+    : PUBLISHER_GROUPS;
+
+  const keyword = search.trim().toLowerCase();
+
+  const filteredGroups = Object.entries(sourceGroups)
+    .map(([group, names]) => [
+      group,
+      names.filter((name) => name.toLowerCase().includes(keyword)),
+    ])
+    .filter(([, names]) => names.length > 0);
+
+  const chooseName = (name) => {
+    onChange({ target: { value: name } });
+    setSearch("");
+    setOpen(false);
+  };
+
+  const clearName = () => {
+    onChange({ target: { value: "" } });
+    setSearch("");
+    setOpen(false);
+  };
+
+  return (
+    <div className="custom-combobox">
+      <button
+        type="button"
+        className="combo-display"
+        onClick={() => setOpen((current) => !current)}
+      >
+        <span>{value || "Select name..."}</span>
+        <span className="combo-arrow">▾</span>
+      </button>
+
+      {open ? (
+        <div className="combo-panel">
+          <input
+            autoFocus
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search name..."
+            className="combo-search"
+          />
+
+          <button
+            type="button"
+            className="combo-clear"
+            onClick={clearName}
+          >
+            Clear selection
+          </button>
+
+          <div className="combo-options">
+            {filteredGroups.length ? (
+              filteredGroups.map(([group, names]) => (
+                <div key={group} className="combo-group">
+                  <div className="combo-group-label">{group}</div>
+
+                  {names.map((name) => (
+                    <button
+                      type="button"
+                      key={`${group}-${name}`}
+                      className={`combo-option ${value === name ? "selected" : ""}`}
+                      onClick={() => chooseName(name)}
+                    >
+                      {name}
+                    </button>
+                  ))}
+                </div>
+              ))
+            ) : (
+              <div className="combo-empty">No names found</div>
+            )}
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -1614,7 +1692,7 @@ function TheocraticScheduler() {
   const publisherSummary = useMemo(() => {
     const map = {};
 
-    PUBLISHERS.forEach((name) => {
+    ALL_ASSIGNMENT_NAMES.forEach((name) => {
       map[name] = {
         name,
         bibleReading: 0,
@@ -1685,7 +1763,7 @@ function TheocraticScheduler() {
       publisherSummary.map((item) => [item.name, item])
     );
 
-    return Object.entries(PUBLISHER_GROUPS).map(([group, names]) => ({
+    return Object.entries(COMBINED_ASSIGNMENT_GROUPS).map(([group, names]) => ({
       group,
       publishers: names
         .map((name) => summaryMap[name])
@@ -1849,12 +1927,22 @@ function TheocraticScheduler() {
 
                         {APPOINTED_FIELDS.map(([field]) => (
                           <td key={field}>
-                            <TheocraticSelect
-                              value={row[field]}
-                              onChange={(e) =>
-                                updateRow(rowIndex, field, e.target.value)
-                              }
-                            />
+                            {field === "reader" ? (
+                              <PublisherSelect
+                                value={row[field]}
+                                onChange={(e) =>
+                                  updateRow(rowIndex, field, e.target.value)
+                                }
+                                includeAppointed={true}
+                              />
+                            ) : (
+                              <TheocraticSelect
+                                value={row[field]}
+                                onChange={(e) =>
+                                  updateRow(rowIndex, field, e.target.value)
+                                }
+                              />
+                            )}
                           </td>
                         ))}
 
