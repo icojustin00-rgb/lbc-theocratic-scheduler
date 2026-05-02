@@ -1383,6 +1383,22 @@ function TheocraticScheduler() {
   const [appointedSearch, setAppointedSearch] = useState("");
   const [publisherSearch, setPublisherSearch] = useState("");
 
+  const visibleStudentPartCount = useMemo(() => {
+    const counts = rows.map((row) =>
+      (row.studentParts || []).filter(
+        (part) =>
+          part.type ||
+          part.title ||
+          part.publisher ||
+          part.partnerPublisher ||
+          part.additionalPublisher ||
+          part.additionalPartnerPublisher
+      ).length
+    );
+
+    return Math.max(1, ...counts);
+  }, [rows]);
+
   useEffect(() => {
     setRows(makeTheocraticRows(month));
     setWorkbookPaste({});
@@ -1981,7 +1997,7 @@ function TheocraticScheduler() {
 
                       <th>Pagbabasa ng Bibliya</th>
 
-                      {Array.from({ length: MAX_STUDENT_PARTS }).map(
+                      {Array.from({ length: visibleStudentPartCount }).map(
                         (_, index) => (
                           <th key={`student-${index}`}>
                             Bahagi {index + 1}
@@ -2083,7 +2099,9 @@ function TheocraticScheduler() {
                                         <div className="living-title">
                                           {part.number
                                             ? `${part.number}. `
-                                            : `Bahagi ${livingIndex + 1}: `}
+                                            : (row.workbook?.livingAssignments || []).length > 1
+                                            ? `Bahagi ${livingIndex + 1}: `
+                                            : ""}
                                           {part.title}
                                           {part.time ? ` — ${part.time}` : ""}
                                         </div>
@@ -2149,7 +2167,7 @@ function TheocraticScheduler() {
                           </div>
                         </td>
 
-                        {row.studentParts.map((part, partIndex) => (
+                        {row.studentParts.slice(0, visibleStudentPartCount).map((part, partIndex) => (
                           <td
                             key={partIndex}
                             className={!part.type ? "inactive" : ""}

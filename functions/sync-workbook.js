@@ -6,184 +6,234 @@ export async function onRequestPost(context) {
       return Response.json({ error: "No URL provided" }, { status: 400 });
     }
 
-    // ===============================
-    // FETCH WORKBOOK (WITH FALLBACK)
-    // ===============================
     let html = "";
 
     try {
-      const res = await fetch(url, {
+      const response = await fetch(url, {
         headers: {
           "User-Agent": "Mozilla/5.0",
           "Accept-Language": "tl,en;q=0.9",
         },
       });
 
-      html = await res.text();
-    } catch {
+      if (response.ok) {
+        html = await response.text();
+      }
+    } catch (error) {
+      html = "";
+    }
+
+    if (!html) {
       const proxyUrl =
         "https://api.allorigins.win/raw?url=" + encodeURIComponent(url);
 
-      const proxy = await fetch(proxyUrl);
-      html = await proxy.text();
+      const proxyResponse = await fetch(proxyUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0",
+          "Accept-Language": "tl,en;q=0.9",
+        },
+      });
+
+      if (!proxyResponse.ok) {
+        throw new Error(`Unable to fetch workbook. Status: ${proxyResponse.status}`);
+      }
+
+      html = await proxyResponse.text();
     }
 
-    // ===============================
-    // CLEAN HTML → TEXT
-    // ===============================
-    const text = html
-      .replace(/&nbsp;/g, " ")
-      .replace(/&amp;/g, "&")
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .replace(/&ldquo;|&rdquo;/g, '"')
-      .replace(/&lsquo;|&rsquo;/g, "'")
+    const decodeHtml = (value) =>
+      String(value || "")
+        .replace(/&nbsp;/g, " ")
+        .replace(/&amp;/g, "&")
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&ldquo;|&rdquo;|&#8220;|&#8221;/g, '"')
+        .replace(/&lsquo;|&rsquo;|&#8216;|&#8217;/g, "'")
+        .replace(/&#x2013;|&#8211;/g, "–")
+        .replace(/&#x2014;|&#8212;/g, "—")
+        .replace(/&#x([0-9a-f]+);/gi, (_, hex) =>
+          String.fromCharCode(parseInt(hex, 16))
+        )
+        .replace(/&#(\d+);/g, (_, num) =>
+          String.fromCharCode(parseInt(num, 10))
+        );
+
+    const cleanedHtml = decodeHtml(html)
       .replace(/<script[\s\S]*?<\/script>/gi, " ")
-      .replace(/<style[\s\S]*?<\/style>/gi, " ")
-      .replace(/<[^>]+>/g, "\n")
-      .replace(/\n+/g, "\n")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ");
+
+    const text = cleanedHtml
+      .replace(/<\/(p|div|li|h1|h2|h3|h4|tr|td|th)>/gi, "\n")
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\r/g, "\n")
+      .replace(/\n{2,}/g, "\n")
       .replace(/[ \t]+/g, " ")
       .trim();
 
     const lines = text
       .split("\n")
-      .map((l) => l.trim())
+      .map((line) => line.trim())
       .filter(Boolean);
 
     const joined = lines.join("\n");
 
-    // ===============================
-    // SONGS
-    // ===============================
-    const songs = [...joined.matchAll(/Awit\s+Bilang\s+(\d+)/gi)]
-      .map((m) => m[1])
-      .filter((v, i, arr) => arr.indexOf(v) === i)
-      .slice(0, 3);
+    const cleanLine = (line) =>
+      String(line || "")
+        .replace(/\s+/g, " ")
+        .replace(/\s+([,.;:])/g, "$1")
+        .trim();
 
-    // ===============================
-    // TIME HELPER
-    // ===============================
-    const getTime = (index) => {
-      for (let i = Math.max(0, index - 4); i <= index + 2; i++) {
-        const match = lines[i]?.match(/\b([7-8]:\d{2})\b/);
+    const getTimeNearLine = (index) => {
+      for (
+        let i = Math.max(0, index - 5);
+        i <= Math.min(lines.length - 1, index + 2);
+        i += 1
+      ) {
+        const match = lines[i].match(/\b([7-8]:\d{2})\b/);
         if (match) return match[1];
       }
+
       return "";
     };
 
-    // ===============================
-    // STUDENT PARTS (SMART DETECT)
-    // ===============================
-    const studentParts = [];
+    const getMinutes = (line) => {
+      const match = line.match(/\((\d+)\s*min\.?\)/i);
+      return match ? match[1] : "";
+    };
 
-    const isStudent = (line) => {
-      const l = line.toLowerCase();
+    const songs = [];
+
+    for (const match of joined.matchAll(/Awit\s+Bilang\s+(\d+)/gi)) {
+      if (!songs.includes(match[1])) songs.push(match[1]);
+    }
+
+    const studentMatchers = [
+      {
+        type: "Pagpapasimula ng Pakikipag-usap",
+        regex: /pagpapasimula\s+ng\s+pakikipag-usap/i,
+      },
+      {
+        type: "Pakikipag-usap Muli",
+        regex: /pakikipag-usap\s+muli/i,
+      },
+      {
+        type: "Paggawa ng mga Alagad",
+        regex: /paggawa\s+ng\s+mga\s+alagad/i,
+      },
+      {
+        type: "Ipaliwanag ang Paniniwala Mo",
+        regex: /ipaliwanag\s+ang\s+paniniwala/i,
+      },
+      {
+        type: "Pahayag",
+        regex: /(^|\s|\.)(pahayag)\s*(\(|$)/i,
+      },
+    ];
+
+    const isStudentPart = (line) =>
+      studentMatchers.some((item) => item.regex.test(line));
+
+    const shouldSkipStudentLine = (line) => {
+      const lower = line.toLowerCase();
 
       return (
-        l.includes("pagpapasimula ng pakikipag-usap") ||
-        l.includes("pakikipag-usap muli") ||
-        l.includes("paggawa ng mga alagad") ||
-        l.includes("ipaliwanag ang paniniwala") ||
-        l.startsWith("pahayag") ||
-        l.includes(" pahayag ")
+        lower.includes("maging mahusay sa ministeryo") ||
+        lower.includes("kayamanan mula") ||
+        lower.includes("pamumuhay bilang") ||
+        lower.includes("estudyante/assistant") ||
+        lower === "estudyante" ||
+        lower === "assistant"
       );
     };
 
-    const getType = (line) => {
-      const l = line.toLowerCase();
+    const studentParts = [];
 
-      if (l.includes("pagpapasimula")) return "Pagpapasimula ng Pakikipag-usap";
-      if (l.includes("pakikipag-usap muli")) return "Pakikipag-usap Muli";
-      if (l.includes("paggawa ng mga alagad")) return "Paggawa ng mga Alagad";
-      if (l.includes("ipaliwanag")) return "Ipaliwanag ang Paniniwala Mo";
-      return "Pahayag";
-    };
+    lines.forEach((rawLine, index) => {
+      const line = cleanLine(rawLine);
+      if (shouldSkipStudentLine(line)) return;
 
-    lines.forEach((line, i) => {
-      if (!isStudent(line)) return;
+      const matched = studentMatchers.find((item) => item.regex.test(line));
+      if (!matched) return;
 
-      if (studentParts.some((p) => p.title === line)) return;
+      if (studentParts.some((part) => part.title === line)) return;
 
       studentParts.push({
-        type: getType(line),
+        type: matched.type,
         title: line,
-        time: getTime(i),
-        minutes: line.match(/\((\d+)\s*min/i)?.[1] || "",
+        time: getTimeNearLine(index),
+        minutes: getMinutes(line),
       });
     });
 
-    // ===============================
-    // TREASURES TITLE
-    // ===============================
     const treasuresTitle =
-      lines.find((l) => /^1\.\s*/.test(l) && /\(\d+\s*min/i.test(l)) || "";
+      lines.find((line) => /^1\.\s*/.test(line) && /\(\d+\s*min/i.test(line)) ||
+      "";
 
-    // ===============================
-    // BIBLE CHAPTERS
-    // ===============================
     const bibleChapters =
       joined.match(/\b(ISAIAS\s+\d+\s*[–-]\s*\d+)/i)?.[1] ||
       joined.match(/\b(ISAIAS\s+\d+)/i)?.[1] ||
       "";
 
-    // ===============================
-    // LIVING PARTS (DYNAMIC)
-    // ===============================
     const livingParts = [];
     let inLiving = false;
 
-    lines.forEach((line, i) => {
-      const l = line.toLowerCase();
+    lines.forEach((rawLine, index) => {
+      const line = cleanLine(rawLine);
+      const lower = line.toLowerCase();
 
-      if (l.includes("pamumuhay bilang kristiyano")) {
+      if (lower.includes("pamumuhay bilang kristiyano")) {
         inLiving = true;
         return;
       }
 
       if (!inLiving) return;
 
-      // STOP collecting once CBS is reached
-if (lower.includes("pag-aaral ng kongregasyon")) {
-  inLiving = false;
-  return;
-}
+      // Stop collecting once CBS starts. CBS and closing comments are handled separately in the app.
+      if (lower.includes("pag-aaral ng kongregasyon")) {
+        inLiving = false;
+        return;
+      }
 
-// SKIP unwanted parts
-if (
-  lower.includes("pangwakas na komento") ||
-  lower.includes("awit bilang")
-) {
-  return;
-}
+      if (
+        lower.includes("pangwakas na komento") ||
+        lower.includes("awit bilang")
+      ) {
+        return;
+      }
 
-      const hasMinutes = /\(\d+\s*min/i.test(line);
-      const isAlreadyStudent = studentParts.some((p) => p.title === line);
+      const hasMinutes = /\(\d+\s*min\.?\)/i.test(line);
+      const isAlreadyStudent = isStudentPart(line);
 
-      if (hasMinutes && !isAlreadyStudent && !l.includes("pambungad")) {
-        if (!livingParts.some((p) => p.title === line)) {
+      if (hasMinutes && !isAlreadyStudent && !lower.includes("pambungad")) {
+        if (!livingParts.some((part) => part.title === line)) {
           livingParts.push({
             title: line,
-            time: getTime(i),
-            minutes: line.match(/\((\d+)\s*min/i)?.[1] || "",
+            time: getTimeNearLine(index),
+            minutes: getMinutes(line),
           });
         }
       }
     });
 
-    // ===============================
-    // RESPONSE
-    // ===============================
     return Response.json({
       weeks: [
         {
           bibleChapters,
-          songs,
+          songs: songs.slice(0, 3),
           openingSong: songs[0] || "",
           middleSong: songs[1] || "",
           closingSong: songs[2] || "",
           treasuresTitle,
           studentParts: studentParts.slice(0, 8),
           livingParts: livingParts.slice(0, 6),
+          debug: {
+            lineCount: lines.length,
+            studentPartCount: studentParts.length,
+            livingPartCount: livingParts.length,
+            sampleStudentParts: studentParts.slice(0, 8),
+            sampleLivingParts: livingParts.slice(0, 6),
+          },
         },
       ],
     });
