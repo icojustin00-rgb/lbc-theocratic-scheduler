@@ -58,7 +58,6 @@ const SOUND_TEAM = [
   "Eugene Masangkay",
   "Kian Ogoy",
   "Guillaume Arenas",
-  "Clarence Umotoy",
 ];
 
 const AV_NOTES_OPTIONS = [
@@ -103,7 +102,6 @@ const MINISTERIALS = [
   "Jundy Raga",
   "Justin Ico",
   "Kian Ogoy",
-  "Jedrey Soriano",
 ];
 
 const APPOINTED_BROTHERS = [...ELDERS, ...MINISTERIALS];
@@ -158,7 +156,6 @@ const PUBLISHER_GROUPS = {
     "Rodolfo Jr. Raga",
     "Yaninah Breanna Raga",
     "Socorro Samortin",
-    "Eugene Masangkay",
   ],
   "Group 4": [
     "Phoebe Cator",
@@ -303,7 +300,7 @@ const ENGLISH_TO_STUDENT_TYPE = {
   Talk: "Pahayag",
 };
 
-const MAX_STUDENT_PARTS = 5;
+const MAX_STUDENT_PARTS = 8;
 
 const ADDITIONAL_CLASS_GROUP_OPTIONS = [
   "",
@@ -424,6 +421,47 @@ function generateMeetingRows(monthValue) {
   return rows;
 }
 
+function generateTheocraticMeetingRows(monthValue) {
+  if (!monthValue || !monthValue.includes("-")) return [];
+
+  const [yearText, monthText] = monthValue.split("-");
+  const year = Number(yearText);
+  const monthIndex = Number(monthText) - 1;
+
+  if (!year || monthIndex < 0) return [];
+
+  const rows = [];
+
+  // Midweek schedule follows the Monday workbook week.
+  // Include every week whose MONDAY belongs to the selected month.
+  // Example: Monday June 29 + Thursday July 2 still belongs to June.
+  const firstDay = new Date(year, monthIndex, 1);
+  const firstMonday = new Date(firstDay);
+
+  const day = firstMonday.getDay();
+  const daysUntilMonday = (1 - day + 7) % 7;
+  firstMonday.setDate(firstMonday.getDate() + daysUntilMonday);
+
+  const currentMonday = new Date(firstMonday);
+
+  while (currentMonday.getMonth() === monthIndex) {
+    const thursday = new Date(currentMonday);
+    thursday.setDate(currentMonday.getDate() + 3);
+
+    rows.push({
+      date: formatDate(thursday),
+      tagalogDate: formatTagalogDate(thursday),
+      meeting: "Midweek Meeting",
+      workbookWeekStart: formatDate(currentMonday),
+      workbookWeekStartTagalog: formatTagalogDate(currentMonday),
+    });
+
+    currentMonday.setDate(currentMonday.getDate() + 7);
+  }
+
+  return rows;
+}
+
 function makeAVRows(monthValue) {
   return generateMeetingRows(monthValue).map((row) => ({
     ...row,
@@ -437,8 +475,7 @@ function makeAVRows(monthValue) {
 }
 
 function makeTheocraticRows(monthValue) {
-  return generateMeetingRows(monthValue)
-    .filter((row) => row.meeting === "Midweek Meeting")
+  return generateTheocraticMeetingRows(monthValue)
     .map((row, index) => {
       const newRow = {
         ...row,
@@ -476,6 +513,7 @@ function makeTheocraticRows(monthValue) {
           closingCommentsTime: "8:37",
           closingSongTime: "8:40",
           livingParts: [],
+          livingAssignments: [],
         },
       };
 
@@ -532,23 +570,9 @@ function inferStudentTypeFromTitle(title) {
 
 function buildStudentPartsFromWorkbook(week) {
   const rawParts = Array.isArray(week?.studentParts) ? week.studentParts : [];
+  const parts = rawParts.length ? rawParts : [];
 
-  return Array.from({ length: MAX_STUDENT_PARTS }).map((_, partIndex) => {
-    const rawPart = rawParts[partIndex];
-
-    if (!rawPart) {
-      return {
-        type: "",
-        title: "",
-        time: "",
-        minutes: "",
-        publisher: "",
-        partnerPublisher: "",
-        additionalPublisher: "",
-        additionalPartnerPublisher: "",
-      };
-    }
-
+  const builtParts = parts.map((rawPart) => {
     if (typeof rawPart === "string") {
       return {
         type: inferStudentTypeFromTitle(rawPart),
@@ -562,15 +586,34 @@ function buildStudentPartsFromWorkbook(week) {
       };
     }
 
+    const title = rawPart.title || rawPart.type || "";
+
     return {
-      type: inferStudentTypeFromTitle(rawPart.type || rawPart.title),
-      title: rawPart.title || rawPart.type || "",
+      type: inferStudentTypeFromTitle(rawPart.type || title),
+      title,
       time: rawPart.time || "",
       minutes: rawPart.minutes || "",
       publisher: "",
       partnerPublisher: "",
+      additionalPublisher: "",
+      additionalPartnerPublisher: "",
     };
   });
+
+  while (builtParts.length < 3) {
+    builtParts.push({
+      type: "",
+      title: "",
+      time: "",
+      minutes: "",
+      publisher: "",
+      partnerPublisher: "",
+      additionalPublisher: "",
+      additionalPartnerPublisher: "",
+    });
+  }
+
+  return builtParts.slice(0, MAX_STUDENT_PARTS);
 }
 
 function detectStudentPartFromLine(line) {
@@ -824,7 +867,7 @@ function PrintableSchedule({ rows }) {
 
   const ministryRows = (row) =>
     row.studentParts
-      .filter((part) => part.type)
+      .filter((part) => part.type || part.title)
       .map((part, index) => ({
         number: index + 4,
         time: part.time || "",
@@ -839,8 +882,9 @@ function PrintableSchedule({ rows }) {
     const middleSong = row.workbook?.middleSong || row.workbook?.songs?.middle || "";
     const closingSong = row.workbook?.closingSong || row.workbook?.songs?.closing || "";
     const bibleChapters = row.workbook?.bibleChapters || "";
-    const firstLivingPart =
-      row.workbook?.livingParts?.[0] || "Pamumuhay Bilang Kristiyano";
+    const livingAssignments = row.workbook?.livingAssignments || [];
+    const firstLivingNumber = 4 + ministryRows(row).length;
+    const cbsNumber = firstLivingNumber + livingAssignments.length;
     const hasNoMeeting = row.meetingStatus && row.meetingStatus !== "normal";
 
     return (
@@ -871,7 +915,7 @@ function PrintableSchedule({ rows }) {
               <div className="s140-time">7:00</div>
               <div className="s140-part italic-bold">Awit Bilang {openingSong}</div>
               <div className="s140-role-inline">Panalangin:</div>
-              <div className="s140-name-inline" data-hall="main">{row.openingPrayer}</div>
+              <div className="s140-name-inline">{row.openingPrayer}</div>
             </div>
 
             <div className="s140-row s140-row-normal">
@@ -894,7 +938,7 @@ function PrintableSchedule({ rows }) {
             <div className="s140-row">
               <div className="s140-time">{row.workbook?.treasuresTime || "7:06"}</div>
               <div className="s140-part">
-                1. {row.workbook?.treasuresTitle || "Kayamanan sa Salita ng Diyos"}&nbsp; (10 min.)
+                1. {row.workbook?.treasuresTitle || "Kayamanan sa Salita ng Diyos"}
               </div>
               <div></div>
               <div></div>
@@ -948,16 +992,31 @@ function PrintableSchedule({ rows }) {
               <div></div>
             </div>
 
-            <div className="s140-row s140-row-normal">
-              <div className="s140-time">{row.workbook?.livingStartTime || "7:52"}</div>
-              <div className="s140-part">{firstLivingPart}</div>
-              <div></div>
-              <div className="s140-name-inline">{row.livingAsChristians}</div>
-            </div>
+            {livingAssignments.length ? (
+              livingAssignments.map((part, livingIndex) => (
+                <div className="s140-row s140-row-normal" key={`${row.date}-living-${livingIndex}`}>
+                  <div className="s140-time">{part.time || (livingIndex === 0 ? row.workbook?.livingStartTime || "7:52" : "")}</div>
+                  <div className="s140-part">
+                    {firstLivingNumber + livingIndex}. {part.title}
+                  </div>
+                  <div></div>
+                  <div className="s140-name-inline">{part.assignee}</div>
+                </div>
+              ))
+            ) : (
+              <div className="s140-row s140-row-normal">
+                <div className="s140-time">{row.workbook?.livingStartTime || "7:52"}</div>
+                <div className="s140-part">{firstLivingNumber}. Pamumuhay Bilang Kristiyano</div>
+                <div></div>
+                <div className="s140-name-inline">{row.livingAsChristians}</div>
+              </div>
+            )}
 
             <div className="s140-row s140-row-normal">
               <div className="s140-time">{row.workbook?.cbsTime || "8:07"}</div>
-              <div className="s140-part">Pag-aaral ng Kongregasyon sa Bibliya&nbsp; (30 min.)</div>
+              <div className="s140-part">
+                {cbsNumber}. Pag-aaral ng Kongregasyon sa Bibliya&nbsp; (30 min.)
+              </div>
               <div className="s140-role-inline">Konduktor/Tagabasa:</div>
               <div className="s140-name-inline">
                 {row.cbs}
@@ -978,7 +1037,6 @@ function PrintableSchedule({ rows }) {
               <div className="s140-role-inline">Panalangin:</div>
               <div className="s140-name-inline">{row.closingPrayer}</div>
             </div>
-
           </>
         )}
       </div>
@@ -1029,25 +1087,6 @@ function AVScheduler() {
         rowIndex === index ? { ...row, [field]: value } : row
       )
     );
-  };
-
-  const handleBulkSync = async () => {
-    const links = bulkLinks
-      .split(/\n|,|;/)
-      .map((link) => link.trim())
-      .filter(Boolean);
-
-    if (!links.length) {
-      alert("Paste at least one workbook link.");
-      return;
-    }
-
-    for (let index = 0; index < links.length; index += 1) {
-      if (!rows[index]) break;
-      await syncWorkbookRow(index, links[index]);
-    }
-
-    alert("Bulk sync complete. Please review the detected parts.");
   };
 
   const autoFill = () => {
@@ -1332,6 +1371,27 @@ function TheocraticScheduler() {
     );
   };
 
+  const updateLivingAssignment = (rowIndex, livingIndex, value) => {
+    setRows((current) =>
+      current.map((row, index) => {
+        if (index !== rowIndex) return row;
+
+        const existingAssignments = row.workbook?.livingAssignments || [];
+        const livingAssignments = existingAssignments.map((part, partIndex) =>
+          partIndex === livingIndex ? { ...part, assignee: value } : part
+        );
+
+        return {
+          ...row,
+          workbook: {
+            ...row.workbook,
+            livingAssignments,
+          },
+        };
+      })
+    );
+  };
+
   const updateStudentPart = (rowIndex, partIndex, field, value) => {
     setRows((current) =>
       current.map((row, index) => {
@@ -1498,6 +1558,14 @@ function TheocraticScheduler() {
               livingParts: Array.isArray(week.livingParts)
                 ? week.livingParts
                 : item.workbook?.livingParts || [],
+              livingAssignments: Array.isArray(week.livingParts)
+                ? week.livingParts.map((part, partIndex) => ({
+                    title: typeof part === "string" ? part : part.title || "",
+                    time: typeof part === "object" ? part.time || "" : "",
+                    minutes: typeof part === "object" ? part.minutes || "" : "",
+                    assignee: item.workbook?.livingAssignments?.[partIndex]?.assignee || "",
+                  }))
+                : item.workbook?.livingAssignments || [],
             },
           };
         })
@@ -1528,8 +1596,27 @@ function TheocraticScheduler() {
       return;
     }
 
+    // Make sure the Theocratic table has the correct workbook-week rows first.
+    // This fixes months with 5 workbook weeks.
+    const freshRows = makeTheocraticRows(month);
+    if (freshRows.length > rows.length) {
+      setRows((current) => {
+        const merged = freshRows.map((freshRow, index) => ({
+          ...freshRow,
+          ...(current[index] || {}),
+          date: freshRow.date,
+          tagalogDate: freshRow.tagalogDate,
+          workbookWeekStart: freshRow.workbookWeekStart,
+          workbookWeekStartTagalog: freshRow.workbookWeekStartTagalog,
+        }));
+
+        return merged;
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+
     for (let index = 0; index < links.length; index += 1) {
-      if (!rows[index]) break;
       await syncWorkbookRow(index, links[index]);
     }
 
@@ -1578,6 +1665,21 @@ function TheocraticScheduler() {
         if (additionalBibleReader) {
           usedPublishers.add(additionalBibleReader);
         }
+
+        next.workbook = {
+          ...next.workbook,
+          livingAssignments: (next.workbook?.livingAssignments || []).map((part) => {
+            const assignee = shuffle(APPOINTED_BROTHERS).find(
+              (name) => !usedAppointed.has(name)
+            ) || "";
+
+            if (assignee) {
+              usedAppointed.add(assignee);
+            }
+
+            return { ...part, assignee };
+          }),
+        };
 
         next.studentParts = next.studentParts.map((part) => {
           if (!part.type) {
@@ -1650,6 +1752,14 @@ function TheocraticScheduler() {
           additionalPublisher: "",
           additionalPartnerPublisher: "",
         }));
+
+        next.workbook = {
+          ...row.workbook,
+          livingAssignments: (row.workbook?.livingAssignments || []).map((part) => ({
+            ...part,
+            assignee: "",
+          })),
+        };
 
         return next;
       })
@@ -2063,6 +2173,35 @@ function TheocraticScheduler() {
                     ))}
                   </tbody>
                 </table>
+
+                <div className="living-parts-box">
+                  <h3>Pamumuhay Parts from Workbook</h3>
+                  <p className="helper-text">
+                    These titles come from the synced workbook. Assign the speaker manually here.
+                  </p>
+
+                  {rows.map((row, rowIndex) => (
+                    <div key={`living-${row.date}`} className="living-row-editor">
+                      <strong>{row.tagalogDate || row.date}</strong>
+
+                      {(row.workbook?.livingAssignments || []).length ? (
+                        row.workbook.livingAssignments.map((part, livingIndex) => (
+                          <div key={`living-part-${livingIndex}`} className="living-assignment-line">
+                            <span>{part.title}</span>
+                            <TheocraticSelect
+                              value={part.assignee}
+                              onChange={(e) =>
+                                updateLivingAssignment(rowIndex, livingIndex, e.target.value)
+                              }
+                            />
+                          </div>
+                        ))
+                      ) : (
+                        <p className="helper-text">No synced Pamumuhay parts yet.</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
 
                 <div className="print-toggle">
                   <button onClick={() => setShowPrintable((value) => !value)}>
