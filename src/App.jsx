@@ -568,31 +568,53 @@ function inferStudentTypeFromTitle(title) {
   return normalizeStudentType(title);
 }
 
+function formatMinutesText(minutes) {
+  const safeMinutes = safeDisplayText(minutes).trim();
+
+  if (!safeMinutes) return "";
+  if (safeMinutes.toLowerCase().includes("min")) return safeMinutes;
+
+  return `(${safeMinutes} min.)`;
+}
+
+function stripLeadingNumber(title) {
+  return safeDisplayText(title).replace(/^\d+\.\s*/, "").trim();
+}
+
+function safeDisplayText(value) {
+  if (value === null || value === undefined) return "";
+
+  if (typeof value === "string" || typeof value === "number") {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(safeDisplayText).filter(Boolean).join(" ");
+  }
+
+  if (typeof value === "object") {
+    return (
+      safeDisplayText(value.title) ||
+      safeDisplayText(value.name) ||
+      safeDisplayText(value.label) ||
+      ""
+    );
+  }
+
+  return String(value);
+}
+
 function buildStudentPartsFromWorkbook(week) {
   const rawParts = Array.isArray(week?.studentParts) ? week.studentParts : [];
-  const parts = rawParts.length ? rawParts : [];
 
-  const builtParts = parts.map((rawPart) => {
-    if (typeof rawPart === "string") {
-      return {
-        type: inferStudentTypeFromTitle(rawPart),
-        title: rawPart,
-        time: "",
-        minutes: "",
-        publisher: "",
-        partnerPublisher: "",
-        additionalPublisher: "",
-        additionalPartnerPublisher: "",
-      };
-    }
-
-    const title = rawPart.title || rawPart.type || "";
+  const builtParts = rawParts.map((rawPart) => {
+    const title = safeDisplayText(rawPart?.title ?? rawPart?.type ?? rawPart);
 
     return {
-      type: inferStudentTypeFromTitle(rawPart.type || title),
+      type: inferStudentTypeFromTitle(rawPart?.type || title),
       title,
-      time: rawPart.time || "",
-      minutes: rawPart.minutes || "",
+      time: safeDisplayText(rawPart?.time),
+      minutes: safeDisplayText(rawPart?.minutes),
       publisher: "",
       partnerPublisher: "",
       additionalPublisher: "",
@@ -618,9 +640,9 @@ function buildStudentPartsFromWorkbook(week) {
 
 function buildLivingAssignments(livingParts, existing = [], startNumber = 7) {
   return (livingParts || []).map((part, index) => {
-    const rawTitle = typeof part === "string" ? part : part.title || "";
-    const time = typeof part === "object" ? part.time || "" : "";
-    const minutes = typeof part === "object" ? part.minutes || "" : "";
+    const rawTitle = safeDisplayText(part?.title ?? part);
+    const time = safeDisplayText(part?.time);
+    const minutes = safeDisplayText(part?.minutes);
 
     const numberMatch = rawTitle.match(/^(\d+)\.\s*/);
     const number = numberMatch ? Number(numberMatch[1]) : startNumber + index;
@@ -892,6 +914,7 @@ function PrintableSchedule({ rows }) {
         time: part.time || "",
         title: part.title || part.type,
         label: needsPartner(part.type) ? "Estudyante/Assistant:" : "Estudyante:",
+        minutes: formatMinutesText(part.minutes),
         mainHall: formatStudentNames(part, "main"),
         additionalClass: formatStudentNames(part, "additional"),
       }));
@@ -960,7 +983,7 @@ function PrintableSchedule({ rows }) {
             <div className="s140-row">
               <div className="s140-time">{row.workbook?.treasuresTime || "7:06"}</div>
               <div className="s140-part">
-                1. {row.workbook?.treasuresTitle || "Kayamanan sa Salita ng Diyos"}
+                1. {stripLeadingNumber(row.workbook?.treasuresTitle) || "Kayamanan sa Salita ng Diyos"}&nbsp; (10 min.)
               </div>
               <div></div>
               <div></div>
@@ -996,8 +1019,9 @@ function PrintableSchedule({ rows }) {
             {ministry.map((part, partIndex) => (
               <div className="s140-row ministry-row" key={`${row.date}-ministry-${partIndex}`}>
                 <div className="s140-time">{part.time}</div>
-                <div className="s140-part">
-                  {part.number}. {part.title}
+                <div className="s140-part s140-part-with-minutes">
+                  <span>{part.number}. {stripLeadingNumber(part.title)}</span>
+                  <span className="s140-minutes">{part.minutes}</span>
                 </div>
                 <div className="s140-role-inline">{part.label}</div>
                 <div className="s140-name-inline">{part.additionalClass}</div>
@@ -1020,9 +1044,12 @@ function PrintableSchedule({ rows }) {
                   <div className="s140-time">
                     {part.time || (livingIndex === 0 ? row.workbook?.livingStartTime || "7:52" : "")}
                   </div>
-                  <div className="s140-part">
-                    {part.number ? `${part.number}. ` : ""}
-                    {part.title}
+                  <div className="s140-part s140-part-with-minutes">
+                    <span>
+                      {part.number ? `${part.number}. ` : ""}
+                      {stripLeadingNumber(part.title)}
+                    </span>
+                    <span className="s140-minutes">{formatMinutesText(part.minutes)}</span>
                   </div>
                   <div></div>
                   <div className="s140-name-inline">{part.assignee}</div>
@@ -2102,7 +2129,7 @@ function TheocraticScheduler() {
                                             : (row.workbook?.livingAssignments || []).length > 1
                                             ? `Bahagi ${livingIndex + 1}: `
                                             : ""}
-                                          {part.title}
+                                          {safeDisplayText(part.title)}
                                           {part.time ? ` — ${part.time}` : ""}
                                         </div>
 
@@ -2173,7 +2200,10 @@ function TheocraticScheduler() {
                             className={!part.type ? "inactive" : ""}
                           >
                             {part.title ? (
-                              <div className="synced-part-title">{part.title}</div>
+                              <div className="synced-part-title">
+                                {stripLeadingNumber(part.title)}
+                                {part.minutes ? ` ${formatMinutesText(part.minutes)}` : ""}
+                              </div>
                             ) : null}
 
                             <select

@@ -916,3 +916,25 @@ textarea {
 .card.scroll::-webkit-scrollbar-track {
   background: #e2e8f0;
 }
+
+
+/* =========================================================
+   PRINTABLE MINUTES ALIGNMENT
+========================================================= */
+
+.s140-part-with-minutes {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.s140-part-with-minutes > span:first-child {
+  min-width: 0;
+}
+
+.s140-minutes {
+  white-space: nowrap;
+  font-weight: 800;
+  margin-left: auto;
+}
