@@ -142,13 +142,19 @@ export async function onRequestPost(context) {
 
       if (!inLiving) return;
 
-      if (
-        l.includes("pag-aaral ng kongregasyon") ||
-        l.includes("pangwakas na komento") ||
-        l.includes("awit bilang")
-      ) {
-        return;
-      }
+      // STOP collecting once CBS is reached
+if (lower.includes("pag-aaral ng kongregasyon")) {
+  inLiving = false;
+  return;
+}
+
+// SKIP unwanted parts
+if (
+  lower.includes("pangwakas na komento") ||
+  lower.includes("awit bilang")
+) {
+  return;
+}
 
       const hasMinutes = /\(\d+\s*min/i.test(line);
       const isAlreadyStudent = studentParts.some((p) => p.title === line);
