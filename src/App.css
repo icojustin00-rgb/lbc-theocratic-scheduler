@@ -753,3 +753,105 @@ textarea {
 .card td {
   position: relative;
 }
+
+
+/* =========================================================
+   DYNAMIC LIVING PART ASSIGNMENTS
+========================================================= */
+
+.living-parts-box {
+  margin-top: 18px;
+  border: 1px solid #dbe3ef;
+  border-radius: 14px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.living-row-editor {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 10px;
+  margin-top: 10px;
+}
+
+.living-assignment-line {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) 260px;
+  gap: 10px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.living-assignment-line span {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+
+/* =========================================================
+   PAMUMUHAY INLINE IN EXISTING COLUMN
+========================================================= */
+
+.living-inline-cell {
+  display: grid;
+  gap: 8px;
+  min-width: 240px;
+}
+
+.living-block {
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 8px;
+}
+
+.living-block:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.living-title {
+  font-weight: 800;
+  font-size: 11px;
+  color: #0f172a;
+  line-height: 1.25;
+  margin-bottom: 5px;
+  text-align: left;
+}
+
+.synced-part-title {
+  font-weight: 800;
+  font-size: 11px;
+  color: #0f172a;
+  line-height: 1.25;
+  margin-bottom: 6px;
+  text-align: left;
+}
+
+/* Better scroll experience for wide table */
+.card.scroll {
+  overflow: auto;
+  max-height: 78vh;
+  position: relative;
+}
+
+.card.scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.wide-table {
+  min-width: 3000px;
+}
+
+.card.scroll::-webkit-scrollbar {
+  height: 14px;
+  width: 14px;
+}
+
+.card.scroll::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 999px;
+}
+
+.card.scroll::-webkit-scrollbar-track {
+  background: #e2e8f0;
+}

@@ -513,8 +513,8 @@ function makeTheocraticRows(monthValue) {
           closingCommentsTime: "8:37",
           closingSongTime: "8:40",
           livingParts: [],
-          livingAssignments: [],
-        },
+                    livingAssignments: [],
+},
       };
 
       APPOINTED_FIELDS.forEach(([field]) => {
@@ -614,6 +614,25 @@ function buildStudentPartsFromWorkbook(week) {
   }
 
   return builtParts.slice(0, MAX_STUDENT_PARTS);
+}
+
+function buildLivingAssignments(livingParts, existing = [], startNumber = 7) {
+  return (livingParts || []).map((part, index) => {
+    const rawTitle = typeof part === "string" ? part : part.title || "";
+    const time = typeof part === "object" ? part.time || "" : "";
+    const minutes = typeof part === "object" ? part.minutes || "" : "";
+
+    const numberMatch = rawTitle.match(/^(\d+)\.\s*/);
+    const number = numberMatch ? Number(numberMatch[1]) : startNumber + index;
+
+    return {
+      number,
+      title: rawTitle,
+      time,
+      minutes,
+      assignee: existing[index]?.assignee || "",
+    };
+  });
 }
 
 function detectStudentPartFromLine(line) {
@@ -882,9 +901,12 @@ function PrintableSchedule({ rows }) {
     const middleSong = row.workbook?.middleSong || row.workbook?.songs?.middle || "";
     const closingSong = row.workbook?.closingSong || row.workbook?.songs?.closing || "";
     const bibleChapters = row.workbook?.bibleChapters || "";
+    const ministry = ministryRows(row);
     const livingAssignments = row.workbook?.livingAssignments || [];
-    const firstLivingNumber = 4 + ministryRows(row).length;
-    const cbsNumber = firstLivingNumber + livingAssignments.length;
+    const cbsNumber =
+      livingAssignments.length && livingAssignments[livingAssignments.length - 1]?.number
+        ? livingAssignments[livingAssignments.length - 1].number + 1
+        : 4 + ministry.length;
     const hasNoMeeting = row.meetingStatus && row.meetingStatus !== "normal";
 
     return (
@@ -971,7 +993,7 @@ function PrintableSchedule({ rows }) {
               <div>Main Hall</div>
             </div>
 
-            {ministryRows(row).map((part, partIndex) => (
+            {ministry.map((part, partIndex) => (
               <div className="s140-row ministry-row" key={`${row.date}-ministry-${partIndex}`}>
                 <div className="s140-time">{part.time}</div>
                 <div className="s140-part">
@@ -995,9 +1017,12 @@ function PrintableSchedule({ rows }) {
             {livingAssignments.length ? (
               livingAssignments.map((part, livingIndex) => (
                 <div className="s140-row s140-row-normal" key={`${row.date}-living-${livingIndex}`}>
-                  <div className="s140-time">{part.time || (livingIndex === 0 ? row.workbook?.livingStartTime || "7:52" : "")}</div>
+                  <div className="s140-time">
+                    {part.time || (livingIndex === 0 ? row.workbook?.livingStartTime || "7:52" : "")}
+                  </div>
                   <div className="s140-part">
-                    {firstLivingNumber + livingIndex}. {part.title}
+                    {part.number ? `${part.number}. ` : ""}
+                    {part.title}
                   </div>
                   <div></div>
                   <div className="s140-name-inline">{part.assignee}</div>
@@ -1006,7 +1031,7 @@ function PrintableSchedule({ rows }) {
             ) : (
               <div className="s140-row s140-row-normal">
                 <div className="s140-time">{row.workbook?.livingStartTime || "7:52"}</div>
-                <div className="s140-part">{firstLivingNumber}. Pamumuhay Bilang Kristiyano</div>
+                <div className="s140-part">Pamumuhay Bilang Kristiyano</div>
                 <div></div>
                 <div className="s140-name-inline">{row.livingAsChristians}</div>
               </div>
@@ -1558,14 +1583,13 @@ function TheocraticScheduler() {
               livingParts: Array.isArray(week.livingParts)
                 ? week.livingParts
                 : item.workbook?.livingParts || [],
-              livingAssignments: Array.isArray(week.livingParts)
-                ? week.livingParts.map((part, partIndex) => ({
-                    title: typeof part === "string" ? part : part.title || "",
-                    time: typeof part === "object" ? part.time || "" : "",
-                    minutes: typeof part === "object" ? part.minutes || "" : "",
-                    assignee: item.workbook?.livingAssignments?.[partIndex]?.assignee || "",
-                  }))
-                : item.workbook?.livingAssignments || [],
+              livingAssignments: buildLivingAssignments(
+                Array.isArray(week.livingParts)
+                  ? week.livingParts
+                  : item.workbook?.livingParts || [],
+                item.workbook?.livingAssignments || [],
+                4 + studentParts.filter((part) => part.title || part.type).length
+              ),
             },
           };
         })
@@ -2047,6 +2071,45 @@ function TheocraticScheduler() {
                                 }
                                 includeAppointed={true}
                               />
+                            ) : field === "livingAsChristians" ? (
+                              <div className="living-inline-cell">
+                                {(row.workbook?.livingAssignments || []).length ? (
+                                  row.workbook.livingAssignments.map(
+                                    (part, livingIndex) => (
+                                      <div
+                                        key={`${row.date}-living-${livingIndex}`}
+                                        className="living-block"
+                                      >
+                                        <div className="living-title">
+                                          {part.number
+                                            ? `${part.number}. `
+                                            : `Bahagi ${livingIndex + 1}: `}
+                                          {part.title}
+                                          {part.time ? ` — ${part.time}` : ""}
+                                        </div>
+
+                                        <TheocraticSelect
+                                          value={part.assignee || ""}
+                                          onChange={(e) =>
+                                            updateLivingAssignment(
+                                              rowIndex,
+                                              livingIndex,
+                                              e.target.value
+                                            )
+                                          }
+                                        />
+                                      </div>
+                                    )
+                                  )
+                                ) : (
+                                  <TheocraticSelect
+                                    value={row[field]}
+                                    onChange={(e) =>
+                                      updateRow(rowIndex, field, e.target.value)
+                                    }
+                                  />
+                                )}
+                              </div>
                             ) : (
                               <TheocraticSelect
                                 value={row[field]}
@@ -2091,6 +2154,10 @@ function TheocraticScheduler() {
                             key={partIndex}
                             className={!part.type ? "inactive" : ""}
                           >
+                            {part.title ? (
+                              <div className="synced-part-title">{part.title}</div>
+                            ) : null}
+
                             <select
                               value={part.type || ""}
                               onChange={(e) =>
@@ -2173,36 +2240,6 @@ function TheocraticScheduler() {
                     ))}
                   </tbody>
                 </table>
-
-                <div className="living-parts-box">
-                  <h3>Pamumuhay Parts from Workbook</h3>
-                  <p className="helper-text">
-                    These titles come from the synced workbook. Assign the speaker manually here.
-                  </p>
-
-                  {rows.map((row, rowIndex) => (
-                    <div key={`living-${row.date}`} className="living-row-editor">
-                      <strong>{row.tagalogDate || row.date}</strong>
-
-                      {(row.workbook?.livingAssignments || []).length ? (
-                        row.workbook.livingAssignments.map((part, livingIndex) => (
-                          <div key={`living-part-${livingIndex}`} className="living-assignment-line">
-                            <span>{part.title}</span>
-                            <TheocraticSelect
-                              value={part.assignee}
-                              onChange={(e) =>
-                                updateLivingAssignment(rowIndex, livingIndex, e.target.value)
-                              }
-                            />
-                          </div>
-                        ))
-                      ) : (
-                        <p className="helper-text">No synced Pamumuhay parts yet.</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
                 <div className="print-toggle">
                   <button onClick={() => setShowPrintable((value) => !value)}>
                     {showPrintable
