@@ -58,6 +58,7 @@ const SOUND_TEAM = [
   "Eugene Masangkay",
   "Kian Ogoy",
   "Guillaume Arenas",
+  "Clarence Umotoy",
 ];
 
 const AV_NOTES_OPTIONS = [
