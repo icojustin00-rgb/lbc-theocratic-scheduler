@@ -157,6 +157,7 @@ const PUBLISHER_GROUPS = {
     "Rodolfo Jr. Raga",
     "Yaninah Breanna Raga",
     "Socorro Samortin",
+    "Eugene Masangkay",
   ],
   "Group 4": [
     "Phoebe Cator",
