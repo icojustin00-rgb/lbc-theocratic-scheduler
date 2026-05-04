@@ -285,6 +285,8 @@ const STUDENT_PART_MINUTES = {
 };
 
 const STARTING_CONVERSATION_MINUTES_OPTIONS = [2, 3];
+const LIVING_MINUTES_OPTIONS = Array.from({ length: 30 }, (_, index) => index + 1);
+const SONG_NUMBER_OPTIONS = Array.from({ length: 160 }, (_, index) => String(index + 1));
 
 function getStudentPartMinutes(part) {
   if (!part) return "";
@@ -1568,6 +1570,28 @@ function TheocraticScheduler() {
     );
   };
 
+  const updateSongNumber = (rowIndex, songKey, value) => {
+    setRows((current) =>
+      current.map((row, index) => {
+        if (index !== rowIndex) return row;
+
+        return {
+          ...row,
+          workbook: {
+            ...row.workbook,
+            [songKey]: value,
+            songs: {
+              ...(row.workbook?.songs || {}),
+              ...(songKey === "openingSong" ? { opening: value } : {}),
+              ...(songKey === "middleSong" ? { middle: value } : {}),
+              ...(songKey === "closingSong" ? { closing: value } : {}),
+            },
+          },
+        };
+      })
+    );
+  };
+
   const updateLivingAssignmentTitle = (rowIndex, livingIndex, value) => {
     setRows((current) =>
       current.map((row, index) => {
@@ -1578,6 +1602,29 @@ function TheocraticScheduler() {
         livingAssignments[livingIndex] = {
           ...livingAssignments[livingIndex],
           title: value,
+        };
+
+        return {
+          ...row,
+          workbook: {
+            ...row.workbook,
+            livingAssignments,
+          },
+        };
+      })
+    );
+  };
+
+  const updateLivingAssignmentMinutes = (rowIndex, livingIndex, value) => {
+    setRows((current) =>
+      current.map((row, index) => {
+        if (index !== rowIndex) return row;
+
+        const livingAssignments = [...(row.workbook?.livingAssignments || [])];
+
+        livingAssignments[livingIndex] = {
+          ...livingAssignments[livingIndex],
+          minutes: value,
         };
 
         return {
@@ -2170,6 +2217,7 @@ function TheocraticScheduler() {
                       <th>Status</th>
                       <th>Karagdagang Klase</th>
                       <th>Tagapayo sa Karagdagang Klase</th>
+                      <th>Awit Bilang</th>
                       <th>Workbook Link</th>
 
                       {APPOINTED_FIELDS.map(([, label]) => (
@@ -2239,6 +2287,55 @@ function TheocraticScheduler() {
                           </select>
                         </td>
 
+                        <td>
+                          <div className="song-select-box">
+                            <label>Opening</label>
+                            <select
+                              value={row.workbook?.openingSong || ""}
+                              onChange={(e) =>
+                                updateSongNumber(rowIndex, "openingSong", e.target.value)
+                              }
+                            >
+                              <option value=""></option>
+                              {SONG_NUMBER_OPTIONS.map((song) => (
+                                <option key={`opening-${song}`} value={song}>
+                                  {song}
+                                </option>
+                              ))}
+                            </select>
+
+                            <label>Middle</label>
+                            <select
+                              value={row.workbook?.middleSong || ""}
+                              onChange={(e) =>
+                                updateSongNumber(rowIndex, "middleSong", e.target.value)
+                              }
+                            >
+                              <option value=""></option>
+                              {SONG_NUMBER_OPTIONS.map((song) => (
+                                <option key={`middle-${song}`} value={song}>
+                                  {song}
+                                </option>
+                              ))}
+                            </select>
+
+                            <label>Closing</label>
+                            <select
+                              value={row.workbook?.closingSong || ""}
+                              onChange={(e) =>
+                                updateSongNumber(rowIndex, "closingSong", e.target.value)
+                              }
+                            >
+                              <option value=""></option>
+                              {SONG_NUMBER_OPTIONS.map((song) => (
+                                <option key={`closing-${song}`} value={song}>
+                                  {song}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </td>
+
                         <td className="sync-cell">
                           <input
                             value={row.workbookUrl || ""}
@@ -2277,14 +2374,50 @@ function TheocraticScheduler() {
                                         key={`${row.date}-living-${livingIndex}`}
                                         className="living-block"
                                       >
-                                        <div className="living-title">
-                                          {part.number
-                                            ? `${part.number}. `
-                                            : (row.workbook?.livingAssignments || []).length > 1
-                                            ? `Bahagi ${livingIndex + 1}: `
-                                            : ""}
-                                          {safeDisplayText(part.title)}
-                                          {part.time ? ` — ${part.time}` : ""}
+                                        <div className="living-title-edit-row">
+                                          <span className="living-title-prefix">
+                                            {part.number
+                                              ? `${part.number}.`
+                                              : (row.workbook?.livingAssignments || []).length > 1
+                                              ? `Bahagi ${livingIndex + 1}:`
+                                              : ""}
+                                          </span>
+
+                                          <input
+                                            className="living-title-input"
+                                            value={stripMinutesText(part.title)}
+                                            onChange={(e) =>
+                                              updateLivingAssignmentTitle(
+                                                rowIndex,
+                                                livingIndex,
+                                                e.target.value
+                                              )
+                                            }
+                                            placeholder="Paste or type Pamumuhay title from workbook..."
+                                          />
+
+                                          <select
+                                            className="living-minutes-select"
+                                            value={String(
+                                              part.minutes ||
+                                                extractMinutesFromText(part.title) ||
+                                                ""
+                                            )}
+                                            onChange={(e) =>
+                                              updateLivingAssignmentMinutes(
+                                                rowIndex,
+                                                livingIndex,
+                                                e.target.value
+                                              )
+                                            }
+                                          >
+                                            <option value=""></option>
+                                            {LIVING_MINUTES_OPTIONS.map((minute) => (
+                                              <option key={minute} value={minute}>
+                                                {minute} min.
+                                              </option>
+                                            ))}
+                                          </select>
                                         </div>
 
                                         <TheocraticSelect

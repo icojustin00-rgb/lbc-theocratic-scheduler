@@ -1005,3 +1005,117 @@ textarea {
   font-weight: 800;
   margin-left: auto;
 }
+
+
+/* =========================================================
+   EDITABLE PAMUMUHAY + SONG DROPDOWNS
+========================================================= */
+
+.song-select-box {
+  display: grid;
+  grid-template-columns: 70px 90px;
+  gap: 6px;
+  align-items: center;
+  min-width: 180px;
+}
+
+.song-select-box label {
+  font-size: 10px;
+  font-weight: 800;
+  color: #475569;
+  text-align: right;
+}
+
+.living-title-edit-row {
+  display: grid;
+  grid-template-columns: auto minmax(160px, 1fr) 90px;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.living-title-prefix {
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.living-title-input {
+  width: 100%;
+  font-weight: 800;
+  font-size: 12px;
+  padding: 7px 8px;
+}
+
+.living-minutes-select {
+  min-width: 90px;
+}
+
+
+/* =========================================================
+   SIMPLER PAMUMUHAY COPY/PASTE TITLE BAR
+========================================================= */
+
+.living-title-edit-row {
+  display: grid;
+  grid-template-columns: auto minmax(220px, 1fr) 90px;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.living-title-prefix {
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.living-title-input {
+  width: 100%;
+  font-weight: 800;
+  font-size: 12px;
+  padding: 7px 9px;
+  border-radius: 8px;
+}
+
+.living-minutes-select {
+  min-width: 90px;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* =========================================================
+   AWIT BILANG CENTERED + BOLD
+========================================================= */
+
+.song-select-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 130px;
+  text-align: center;
+  margin: 0 auto;
+}
+
+.song-select-box label {
+  font-size: 11px;
+  font-weight: 800;
+  margin-bottom: 2px;
+}
+
+.song-select-box select {
+  width: 100%;
+  max-width: 110px;
+  padding: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.sync-cell {
+  min-width: 240px;
+}
+
+.card td {
+  vertical-align: middle;
+}
