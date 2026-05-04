@@ -276,6 +276,90 @@ const APPOINTED_FIELDS = [
   ["closingPrayer", "Pangwakas na Panalangin"],
 ];
 
+const STUDENT_PART_MINUTES = {
+  "Pagpapasimula ng Pakikipag-usap": 3,
+  "Pakikipag-usap Muli": 4,
+  "Paggawa ng mga Alagad": 5,
+  "Ipaliwanag ang Paniniwala Mo": 3,
+  Pahayag: 5,
+};
+
+const STARTING_CONVERSATION_MINUTES_OPTIONS = [2, 3];
+
+function getStudentPartMinutes(part) {
+  if (!part) return "";
+
+  const explicitMinutes = Number(safeDisplayText(part.minutes).replace(/\D/g, ""));
+
+  if (explicitMinutes) return explicitMinutes;
+
+  return STUDENT_PART_MINUTES[part.type] || "";
+}
+
+function formatClockTime(totalMinutes) {
+  const hours24 = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  const hours12 = hours24 > 12 ? hours24 - 12 : hours24;
+
+  return `${hours12}:${String(minutes).padStart(2, "0")}`;
+}
+
+function parseClockTime(timeText, fallback = "7:31") {
+  const match = safeDisplayText(timeText || fallback).match(/(\d{1,2}):(\d{2})/);
+
+  if (!match) return 19 * 60 + 31;
+
+  let hours = Number(match[1]);
+  const minutes = Number(match[2]);
+
+  if (hours < 12) hours += 12;
+
+  return hours * 60 + minutes;
+}
+
+function buildTimedStudentParts(parts, startTime = "7:31") {
+  let current = parseClockTime(startTime || "7:31");
+
+  return (parts || [])
+    .filter((part) => part.type || part.title)
+    .map((part, index) => {
+      const minutes = getStudentPartMinutes(part);
+
+      const timedPart = {
+        ...part,
+        displayNumber: index + 4,
+        displayTime: formatClockTime(current),
+        displayMinutes: minutes ? `(${minutes} min.)` : "",
+      };
+
+      current += Number(minutes || 0);
+
+      return timedPart;
+    });
+}
+
+function buildTimedLivingParts(parts, startNumber, startTime = "7:52") {
+  let current = parseClockTime(startTime || "7:52");
+
+  return (parts || []).map((part, index) => {
+    const minutes =
+      Number(safeDisplayText(part.minutes).replace(/\D/g, "")) ||
+      Number(extractMinutesFromText(part.title)) ||
+      0;
+
+    const timedPart = {
+      ...part,
+      displayNumber: part.number || startNumber + index,
+      displayTime: part.time || formatClockTime(current),
+      displayMinutes: minutes ? `(${minutes} min.)` : "",
+    };
+
+    current += minutes;
+
+    return timedPart;
+  });
+}
+
 const STUDENT_PART_TYPES = [
   "Pagpapasimula ng Pakikipag-usap",
   "Pakikipag-usap Muli",
@@ -579,6 +663,20 @@ function formatMinutesText(minutes) {
 
 function stripLeadingNumber(title) {
   return safeDisplayText(title).replace(/^\d+\.\s*/, "").trim();
+}
+
+function extractMinutesFromText(value) {
+  const text = safeDisplayText(value);
+  const match = text.match(/\((\d+)\s*min\.?\)/i);
+  return match ? match[1] : "";
+}
+
+function stripMinutesText(title) {
+  return stripLeadingNumber(title).replace(/\s*\(\d+\s*min\.?\)\s*/gi, "").trim();
+}
+
+function getPartMinutes(part) {
+  return formatMinutesText(part?.minutes || extractMinutesFromText(part?.title));
 }
 
 function safeDisplayText(value) {
@@ -907,17 +1005,18 @@ function PrintableSchedule({ rows }) {
   };
 
   const ministryRows = (row) =>
-    row.studentParts
-      .filter((part) => part.type || part.title)
-      .map((part, index) => ({
-        number: index + 4,
-        time: part.time || "",
-        title: part.title || part.type,
-        label: needsPartner(part.type) ? "Estudyante/Assistant:" : "Estudyante:",
-        minutes: formatMinutesText(part.minutes),
-        mainHall: formatStudentNames(part, "main"),
-        additionalClass: formatStudentNames(part, "additional"),
-      }));
+    buildTimedStudentParts(
+      row.studentParts || [],
+      row.workbook?.ministryStartTime || "7:31"
+    ).map((part) => ({
+      number: part.displayNumber,
+      time: part.displayTime,
+      title: part.title || part.type,
+      label: needsPartner(part.type) ? "Estudyante/Assistant:" : "Estudyante:",
+      minutes: part.displayMinutes,
+      mainHall: formatStudentNames(part, "main"),
+      additionalClass: formatStudentNames(part, "additional"),
+    }));
 
   const renderSchedule = (row, index) => {
     const openingSong = row.workbook?.openingSong || row.workbook?.songs?.opening || "";
@@ -925,11 +1024,44 @@ function PrintableSchedule({ rows }) {
     const closingSong = row.workbook?.closingSong || row.workbook?.songs?.closing || "";
     const bibleChapters = row.workbook?.bibleChapters || "";
     const ministry = ministryRows(row);
-    const livingAssignments = row.workbook?.livingAssignments || [];
+
+    const lastMinistry = ministry[ministry.length - 1];
+    const ministryEndTime = lastMinistry
+      ? formatClockTime(
+          parseClockTime(lastMinistry.time) +
+            Number(String(lastMinistry.minutes).replace(/\D/g, "") || 0)
+        )
+      : row.workbook?.livingSongTime || "7:47";
+
+    const livingSongTime = row.workbook?.livingSongTime || ministryEndTime || "7:47";
+
+    const livingAssignments = buildTimedLivingParts(
+      row.workbook?.livingAssignments || [],
+      4 + ministry.length,
+      row.workbook?.livingStartTime || "7:52"
+    );
+
     const cbsNumber =
-      livingAssignments.length && livingAssignments[livingAssignments.length - 1]?.number
-        ? livingAssignments[livingAssignments.length - 1].number + 1
+      livingAssignments.length && livingAssignments[livingAssignments.length - 1]?.displayNumber
+        ? livingAssignments[livingAssignments.length - 1].displayNumber + 1
         : 4 + ministry.length;
+
+    const cbsTime =
+      livingAssignments.length && livingAssignments[livingAssignments.length - 1]
+        ? formatClockTime(
+            parseClockTime(livingAssignments[livingAssignments.length - 1].displayTime) +
+              Number(
+                String(livingAssignments[livingAssignments.length - 1].displayMinutes).replace(
+                  /\D/g,
+                  ""
+                ) || 0
+              )
+          )
+        : row.workbook?.cbsTime || "8:07";
+
+    const closingCommentsTime = formatClockTime(parseClockTime(cbsTime) + 30);
+    const closingSongTime = formatClockTime(parseClockTime(closingCommentsTime) + 3);
+
     const hasNoMeeting = row.meetingStatus && row.meetingStatus !== "normal";
 
     return (
@@ -983,7 +1115,7 @@ function PrintableSchedule({ rows }) {
             <div className="s140-row">
               <div className="s140-time">{row.workbook?.treasuresTime || "7:06"}</div>
               <div className="s140-part">
-                1. {stripLeadingNumber(row.workbook?.treasuresTitle) || "Kayamanan sa Salita ng Diyos"}&nbsp; (10 min.)
+                1. {stripMinutesText(row.workbook?.treasuresTitle) || "Kayamanan sa Salita ng Diyos"}&nbsp; (10 min.)
               </div>
               <div></div>
               <div></div>
@@ -1020,7 +1152,7 @@ function PrintableSchedule({ rows }) {
               <div className="s140-row ministry-row" key={`${row.date}-ministry-${partIndex}`}>
                 <div className="s140-time">{part.time}</div>
                 <div className="s140-part s140-part-with-minutes">
-                  <span>{part.number}. {stripLeadingNumber(part.title)}</span>
+                  <span>{part.number}. {stripMinutesText(part.title)}</span>
                   <span className="s140-minutes">{part.minutes}</span>
                 </div>
                 <div className="s140-role-inline">{part.label}</div>
@@ -1032,7 +1164,7 @@ function PrintableSchedule({ rows }) {
             <div className="s140-section s140-red">PAMUMUHAY BILANG KRISTIYANO</div>
 
             <div className="s140-row s140-row-normal">
-              <div className="s140-time">{row.workbook?.livingSongTime || "7:47"}</div>
+              <div className="s140-time">{livingSongTime}</div>
               <div className="s140-part italic-bold">Awit Bilang {middleSong}</div>
               <div></div>
               <div></div>
@@ -1041,15 +1173,12 @@ function PrintableSchedule({ rows }) {
             {livingAssignments.length ? (
               livingAssignments.map((part, livingIndex) => (
                 <div className="s140-row s140-row-normal" key={`${row.date}-living-${livingIndex}`}>
-                  <div className="s140-time">
-                    {part.time || (livingIndex === 0 ? row.workbook?.livingStartTime || "7:52" : "")}
-                  </div>
+                  <div className="s140-time">{part.displayTime}</div>
                   <div className="s140-part s140-part-with-minutes">
                     <span>
-                      {part.number ? `${part.number}. ` : ""}
-                      {stripLeadingNumber(part.title)}
+                      {part.displayNumber}. {stripMinutesText(part.title)}
                     </span>
-                    <span className="s140-minutes">{formatMinutesText(part.minutes)}</span>
+                    <span className="s140-minutes">{part.displayMinutes}</span>
                   </div>
                   <div></div>
                   <div className="s140-name-inline">{part.assignee}</div>
@@ -1065,7 +1194,7 @@ function PrintableSchedule({ rows }) {
             )}
 
             <div className="s140-row s140-row-normal">
-              <div className="s140-time">{row.workbook?.cbsTime || "8:07"}</div>
+              <div className="s140-time">{cbsTime}</div>
               <div className="s140-part">
                 {cbsNumber}. Pag-aaral ng Kongregasyon sa Bibliya&nbsp; (30 min.)
               </div>
@@ -1077,14 +1206,14 @@ function PrintableSchedule({ rows }) {
             </div>
 
             <div className="s140-row s140-row-normal">
-              <div className="s140-time">{row.workbook?.closingCommentsTime || "8:37"}</div>
+              <div className="s140-time">{closingCommentsTime}</div>
               <div className="s140-part">Pangwakas na Komento&nbsp; (3 min.)</div>
               <div></div>
               <div className="s140-name-inline">{row.chairman}</div>
             </div>
 
             <div className="s140-row s140-row-normal">
-              <div className="s140-time">{row.workbook?.closingSongTime || "8:40"}</div>
+              <div className="s140-time">{closingSongTime}</div>
               <div className="s140-part italic-bold">Awit Bilang {closingSong}</div>
               <div className="s140-role-inline">Panalangin:</div>
               <div className="s140-name-inline">{row.closingPrayer}</div>
@@ -1439,6 +1568,29 @@ function TheocraticScheduler() {
     );
   };
 
+  const updateLivingAssignmentTitle = (rowIndex, livingIndex, value) => {
+    setRows((current) =>
+      current.map((row, index) => {
+        if (index !== rowIndex) return row;
+
+        const livingAssignments = [...(row.workbook?.livingAssignments || [])];
+
+        livingAssignments[livingIndex] = {
+          ...livingAssignments[livingIndex],
+          title: value,
+        };
+
+        return {
+          ...row,
+          workbook: {
+            ...row.workbook,
+            livingAssignments,
+          },
+        };
+      })
+    );
+  };
+
   const updateLivingAssignment = (rowIndex, livingIndex, value) => {
     setRows((current) =>
       current.map((row, index) => {
@@ -1474,6 +1626,8 @@ function TheocraticScheduler() {
             if (!updatedPart.title || STUDENT_PART_TYPES.includes(updatedPart.title)) {
               updatedPart.title = value;
             }
+
+            updatedPart.minutes = String(STUDENT_PART_MINUTES[value] || "");
 
             if (!needsPartner(value)) {
               updatedPart.partnerPublisher = "";
@@ -2201,8 +2355,8 @@ function TheocraticScheduler() {
                           >
                             {part.title ? (
                               <div className="synced-part-title">
-                                {stripLeadingNumber(part.title)}
-                                {part.minutes ? ` ${formatMinutesText(part.minutes)}` : ""}
+                                {stripMinutesText(part.title)}
+                                {getStudentPartMinutes(part) ? ` (${getStudentPartMinutes(part)} min.)` : ""}
                               </div>
                             ) : null}
 
@@ -2224,6 +2378,26 @@ function TheocraticScheduler() {
                                 </option>
                               ))}
                             </select>
+
+                            {part.type === "Pagpapasimula ng Pakikipag-usap" ? (
+                              <select
+                                value={String(part.minutes || STUDENT_PART_MINUTES[part.type] || 3)}
+                                onChange={(e) =>
+                                  updateStudentPart(
+                                    rowIndex,
+                                    partIndex,
+                                    "minutes",
+                                    e.target.value
+                                  )
+                                }
+                              >
+                                {STARTING_CONVERSATION_MINUTES_OPTIONS.map((minute) => (
+                                  <option key={minute} value={minute}>
+                                    {minute} min.
+                                  </option>
+                                ))}
+                              </select>
+                            ) : null}
 
                             {part.type ? (
                               <div className="hall-assignment-box">

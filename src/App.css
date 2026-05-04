@@ -963,3 +963,45 @@ textarea {
   font-size: 11px;
   padding: 5px 6px;
 }
+
+
+/* =========================================================
+   MINUTE-BASED TIME CALCULATION UI
+========================================================= */
+
+.living-title {
+  display: grid;
+  grid-template-columns: auto minmax(130px, 1fr) auto;
+  gap: 4px;
+  align-items: center;
+}
+
+.living-title-prefix,
+.living-title-meta {
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.living-title-input {
+  width: 100%;
+  font-weight: 800;
+  font-size: 11px;
+  padding: 5px 6px;
+}
+
+.s140-part-with-minutes {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.s140-part-with-minutes > span:first-child {
+  min-width: 0;
+}
+
+.s140-minutes {
+  white-space: nowrap;
+  font-weight: 800;
+  margin-left: auto;
+}
