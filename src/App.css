@@ -938,3 +938,28 @@ textarea {
   font-weight: 800;
   margin-left: auto;
 }
+
+
+/* =========================================================
+   EDITABLE PAMUMUHAY TITLE
+========================================================= */
+
+.living-title {
+  display: grid;
+  grid-template-columns: auto minmax(130px, 1fr) auto;
+  gap: 4px;
+  align-items: center;
+}
+
+.living-title-prefix,
+.living-title-meta {
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.living-title-input {
+  width: 100%;
+  font-weight: 800;
+  font-size: 11px;
+  padding: 5px 6px;
+}
