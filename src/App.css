@@ -1119,3 +1119,16 @@ textarea {
 .card td {
   vertical-align: middle;
 }
+
+/* REMOVE flex behavior for pamumuhay rows */
+.s140-row-normal .s140-part-with-minutes {
+  display: inline;   /* instead of flex */
+}
+
+/* Title + minutes behave like normal text */
+.s140-row-normal .s140-minutes {
+  display: inline;
+  margin-left: 6px;   /* small natural spacing */
+  font-weight: 800;
+  white-space: nowrap; /* keep (6 min.) intact */
+}
